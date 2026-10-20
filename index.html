@@ -105,8 +105,8 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .timer{height:12px; background:var(--stage-2); border-radius:999px; overflow:hidden}
 .timer i{display:block; height:100%; width:100%; background:var(--ink); transform-origin:left; border-radius:999px}
 .timer.low i{background:var(--bad)}
-.tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:auto}
-.tile{position:relative; min-height:92px; border-radius:16px; padding:14px 14px 14px 36px; text-align:left;
+.tiles{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px}
+.tile{position:relative; min-height:110px; border-radius:16px; padding:14px 14px 14px 36px; text-align:left;
   color:var(--tile-ink); font-weight:700; font-size:1.15rem; line-height:1.2; box-shadow:0 5px 0 rgba(0,0,0,.35)}
 .tile:active{transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.35)}
 .tile .sh{position:absolute; left:12px; top:12px; font-size:.95rem; opacity:.55}
@@ -161,7 +161,7 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
   *,*::before,*::after{animation:none!important; transition:none!important}
 }
 @media (max-width:380px){
-  .qtext{font-size:1.4rem} .tile{min-height:80px; font-size:1.05rem} .brand h1{font-size:2.2rem}
+  .qtext{font-size:1.5rem} .tile{min-height:100px; font-size:1.1rem} .brand h1{font-size:2.2rem}
   .prow{grid-template-columns:46px 1fr auto; row-gap:4px} .prow .opts{grid-column:2/-1; grid-row:2; justify-content:flex-start}
   .prow > :last-child{grid-column:3; grid-row:1}
 }
