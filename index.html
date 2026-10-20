@@ -162,7 +162,8 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 }
 @media (max-width:380px){
   .qtext{font-size:1.4rem} .tile{min-height:80px; font-size:1.05rem} .brand h1{font-size:2.2rem}
-  .prow{grid-template-columns:46px 1fr auto} .prow .opts{grid-column:1/-1; justify-content:flex-end}
+  .prow{grid-template-columns:46px 1fr auto; row-gap:4px} .prow .opts{grid-column:2/-1; grid-row:2; justify-content:flex-start}
+  .prow > :last-child{grid-column:3; grid-row:1}
 }
 </style>
 
