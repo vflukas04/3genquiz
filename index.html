@@ -95,7 +95,7 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .qcat{display:flex; align-items:center; justify-content:space-between; gap:10px}
 .qcat .label{display:flex; align-items:center; gap:6px}
 .speak{width:46px; height:46px; border-radius:50%; background:var(--panel); font-family:var(--emoji); font-size:1.3rem}
-.qtext.long{font-size:1.25rem!important}
+.qtext.long{font-size:1.2rem!important; line-height:1.3}
 .qtext{font-size:1.65rem; font-family:var(--font-display); font-weight:600; text-wrap:balance}
 .bigshow{display:grid; place-items:center; min-height:120px; background:var(--stage-2); border-radius:18px; padding:12px; text-align:center}
 .bigshow .em{font-family:var(--emoji); font-size:4.6rem; line-height:1.1; word-break:break-word}
@@ -336,7 +336,25 @@ const Q = {
   [2,'⚫','Welche Farben hatte der Verein bei seiner Gründung 1899?','Schwarz und Weiß','Lila und Weiß','Blau und Weiß','Rot und Weiß'],
   [2,'🎯','Wer war 2023/24 mit 10 Toren bester VfL-Torschütze?','Erik Engelhardt','Robin Meißner','Marc Heider','Sebastian Kerk'],
   [2,'🎯','Wer war 2014/15 mit 14 Toren bester VfL-Torschütze?','Stanislav Ilyuchenko','Adriano Grimaldi','Kwasi Wriedt','Marcos Álvarez'],
-  [2,'🎯','Welcher Stürmer war zweimal bester VfL-Torschütze einer Saison (2015/16 und 2019/20)?','Marcos Álvarez','Halil Savran','Kwasi Wriedt','Nicky Adler']
+  [2,'🎯','Welcher Stürmer war zweimal bester VfL-Torschütze einer Saison (2015/16 und 2019/20)?','Marcos Álvarez','Halil Savran','Kwasi Wriedt','Nicky Adler'],
+  // ---- Spiel-Rätsel (Stufe 3, Erwachsene) – geprüft gegen DFB-Datencenter u. a., 23.10.2026 ----
+  [3,'🔄','August 2009, Bremer Brücke, Saison des Aufstiegs in die 2. Liga: Zur Pause liegt der VfL gegen Ingolstadt 1:2 hinten und gewinnt noch 5:2. Ein Mittelfeldspieler trifft dreimal. Wer?','Björn Lindemann','Dennis Schmidt','Matthias Heidrich','Angelo Barletta'],
+  [3,'🙃','September 2009: Gegen den Klub von der Brenz liegt der VfL zur Pause 0:2 hinten und gewinnt noch 3:2. Das Siegtor kurz vor Schluss ist besonders. Wie fiel es?','Eigentor eines Heidenheimers','Direkter Freistoß','Elfmeter','Fallrückzieher'],
+  [3,'🌲','Freitagabend, Februar 2011, Alte Försterei: Der VfL führt kurz nach der Pause 2:0, liegt nach 72 Minuten 2:3 hinten – und rettet noch ein 3:3. Wer erzielte den Ausgleich?','Nicky Adler','Tobias Nickenig','Sebastian Tyrala','Thomas Reichenberger'],
+  [3,'🇸🇮','Freitagabend in Saarbrücken: Zur Pause 0:2, am Ende 2:2. Den Ausgleich erzielt ein junger Slowene, der später für Dortmund, Leverkusen und Leipzig spielte. In welcher Saison?','2011/12','2010/11','2012/13','2013/14'],
+  [3,'🐂','Freitagabend an der Bremer Brücke: Für einen ehrgeizigen Neuling aus Sachsen trifft ein späterer dänischer Nationalstürmer, zur Pause steht es 1:2. Der VfL gewinnt noch 3:2. Der Gegner blieb nur ein Jahr in der 3. Liga. Welche Saison?','2013/14','2012/13','2014/15','2015/16'],
+  [3,'🧤','Herbst 2014 in Unterhaching: Der VfL führt 3:1, dann trifft der Sohn eines früheren Nationaltorwarts dreimal – 3:3. Kurz vor Schluss gewinnt der VfL doch noch 4:3. Wer schoss das Siegtor?','Addy-Waku Menga','Stanislav Iljutcenko','Halil Savran','Michael Hohnstedt'],
+  [3,'😱','Mittwochabend-Derby, Februar 2015: Nach 16 Minuten liegt der VfL gegen Bielefeld 0:3 hinten, am Ende heißt es 0:4. Wer traf zweimal für die Arminia?','Fabian Klos','Christian Müller','Andreas Voglsammer'],
+  [3,'⏱️','Dienstagabend in der Lausitz, August 2015: Der VfL dreht ein 0:1 und trifft in der Nachspielzeit zum 2:1-Sieg. Wer?','Halil Savran','Michael Hohnstedt','Marcos Álvarez','Addy-Waku Menga'],
+  [3,'🤯','Mittwochabend-Derby gegen Münster, September 2015: In der 90. Minute geht Preußen in Führung – ein Osnabrücker lenkt den Ball ins eigene Tor. Wie endet das Spiel?','2:2','1:2','2:1','3:2'],
+  [3,'🏰','März 2017 in Regensburg: Zur Pause 0:1, dann gleicht Ahmet Arslan aus, und in der 89. Minute trifft der Stürmer, der in dieser Saison die meisten VfL-Tore schoss. Wer?','Kwasi Wriedt','Halil Savran','Marc Heider','Marcos Álvarez'],
+  [3,'🔁','Sonntag, Februar 2018, Derby im Tecklenburger Land: 2:2 nach 51 Minuten, dann trifft in der Nachspielzeit ein Mittelfeldspieler, der später zweimal als Interimstrainer des VfL einspringt. Wer?','Tim Danneberg','Marcos Álvarez','Marc Heider','Konstantin Engel'],
+  [3,'🎢','Mittwochabend, Nachholspiel in Erfurt, März 2018: Bis zur 67. Minute fallen acht Tore, danach keines mehr. Wie endet das Spiel?','4:4','5:3 für Osnabrück','5:3 für Erfurt','6:2 für Erfurt'],
+  [3,'💰','Montagabend, November 2018, Aufstiegssaison: Gegen einen Klub mit russischem Investor liegt der VfL 0:1 hinten, gleicht aus und gewinnt in der Nachspielzeit per Handelfmeter. Wer verwandelte?','Marcos Álvarez','Tim Danneberg','Marc Heider','Benjamin Girth'],
+  [3,'🦠','Freitagabend, März 2020: Zur Pause steht es an der Bremer Brücke 2:5, ein Gegner trifft dreimal. Das 2:6 erzielt ein Mann, der heute für den VfL spielt. Kurz darauf wird der Spielbetrieb wegen Corona unterbrochen. Gegen wen?','SV Wehen Wiesbaden','Hannover 96','Arminia Bielefeld','Holstein Kiel'],
+  [3,'🎩','November 2020 in Regensburg: Der VfL gewinnt 4:2, ein Spieler trifft dreimal – zweimal per Elfmeter. Er wurde in dieser Saison bester VfL-Torschütze. Wer?','Sebastian Kerk','Etienne Amenyido','Marc Heider','Ulrich Taffertshofer'],
+  [3,'💥','Ein Sonntag im September beim Nachbarn aus der Landeshauptstadt: Der VfL verliert 0:7. In welcher Saison?','2023/24','2019/20','2020/21','2024/25'],
+  [3,'🎆','Freitagabend im Dezember 2025, Meistersaison: Der VfL gewinnt auswärts in einem Torfestival 5:3. Wo?','Ulm','Aachen','Saarbrücken','Verl']
  ],
  brett: [
   [1,'🎲','Wie viele Seiten hat ein normaler Würfel?','6','4','8','5'],
@@ -474,6 +492,11 @@ function genK1(){
 }
 function genStatic(cat, lv){
   const all = Q[cat];
+  // VfL: Erwachsene bekommen meist Spiel-Rätsel (Stufe 3)
+  if (cat === 'vfl' && lv === 2 && Math.random() < .65) {
+    const r = pickFresh(all.filter(q => q[0] === 3), x => cat+x[2]);
+    if (r) return mk(r[2], {em:r[1]}, r[3], r.slice(4));
+  }
   let pool = all.filter(q => q[0] === lv);
   let q = pickFresh(pool, x => cat+x[2]);
   if (!q) q = pickFresh(all, x => cat+x[2]);
@@ -686,7 +709,7 @@ function memorize(p){
 
 function question(p){
   const q = G.q, cat = q.cat;
-  const limit = TIME[p.level][cat in TIME[p.level] ? cat : 'std'];
+  const limit = TIME[p.level][cat in TIME[p.level] ? cat : 'std'] + (q.prompt.length > 140 ? 12 : 0);
   const label = cat === 'physik'
     ? `${faceHTML('lukasmini')}<span>Lukas’ Physikfrage · ×2</span>`
     : `<span>${CATS[cat].e}</span><span>${CATS[cat].name}</span>`;
