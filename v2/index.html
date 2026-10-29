@@ -228,6 +228,12 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .codein{font-family:var(--font-display); font-size:2.6rem; letter-spacing:.35em; text-transform:uppercase; text-align:center; width:100%;
   background:var(--stage-2); color:var(--ink); border:2px solid var(--line); border-radius:14px; padding:12px}
 .btn:disabled{opacity:.45}
+.lukas.watch{opacity:.97}
+.lukas .small-dark{font-weight:700; font-size:1rem; opacity:.8; margin:0}
+.linkbtn{background:none; text-decoration:underline; font-size:.85rem}
+.logtext{width:100%; min-height:45vh; font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; background:var(--stage-2); color:var(--ink);
+  border:1px solid var(--line); border-radius:12px; padding:10px; white-space:pre; overflow:auto}
+.gh .half{font-style:normal; color:var(--t3); font-size:.58rem}
 </style>
 
 <div id="app"></div>
@@ -265,7 +271,7 @@ const COLS = [
   {k:'farben',     n:'Farben',     e:'🎨'},
   {k:'geschichte', n:'Geschichte', e:'📜'},
   {k:'form',       n:'Form',       e:'🔷'},
-  {k:'klasse1',    n:'1. Klasse',  e:'✏️'},
+  {k:'klasse1',    n:'1. Klasse',  e:'✏️', half:true},
   {k:'kurios',     n:'Kurioses',   e:'🤯'}
 ];
 const cellRC = i => [Math.floor(i / 5), i % 5];
@@ -658,12 +664,12 @@ function hostStart(after){
       if (e && e.type === 'unavailable-id' && tries++ < 3) {     // Code belegt (z. B. alte Sitzung): neuen Code ziehen
         try { peer.destroy(); } catch {}
         S.netCode = Array.from({length:4}, () => CODE_CHARS[rnd(CODE_CHARS.length)]).join(''); save(); NET.code = S.netCode; open();
-      } else netError('Verbindungsdienst nicht erreichbar. Prüfe die Internetverbindung oder spielt auf einem Gerät.');
+      } else { log('netzfehler', {typ: e && e.type}); netError('Verbindungsdienst nicht erreichbar. Prüfe die Internetverbindung oder spielt auf einem Gerät.'); }
     });
     peer.on('connection', conn => {
       conn.on('open', () => conn.send({t:'players', list:S.players.filter(p => p.remote).map(p => ({id:p.id, name:p.name, emoji:p.emoji, taken:online(p)}))}));
       conn.on('data', m => hostMsg(conn, m));
-      conn.on('close', () => { for (const id in NET.conns) if (NET.conns[id] === conn) delete NET.conns[id]; netRefresh(); });
+      conn.on('close', () => { log('getrennt', {spieler: (P(conn.pid) || {}).name}); for (const id in NET.conns) if (NET.conns[id] === conn) delete NET.conns[id]; netRefresh(); });
     });
   };
   open();
@@ -676,15 +682,17 @@ function hostMsg(conn, m){
     NET.conns[p.id] = conn; conn.pid = p.id;
     conn.send({t:'claimed', id:p.id, name:p.name, emoji:p.emoji});
     if (NET.screen) sendScreen(conn); else conn.send({t:'wait', msg:'Verbunden! Gleich geht’s los.'});
-    if (NET.overlay) conn.send({t:'overlay', html:NET.overlay});
+    if (NET.overlay) conn.send({t:'overlay', html:overlayFor(conn, NET.overlay), inter: NET.overlay.forId === conn.pid});
+    log('verbunden', {spieler: p.name});
     netRefresh();
     return;
   }
+  if (m.t === 'log') { log('gast:' + ((P(conn.pid) || {}).name || '?'), m.d); return; }
   if (m.t === 'act') {
     const ow = screenOwner();
     const allowed = ['ready','cell','take','answer','next','speak','play','lukasGo'];
-    if (!ow || ow.id !== conn.pid || !allowed.includes(m.a)) return;   // nur wer dran ist, darf klicken
-    act(m.a, +m.i, m.v, null);
+    if (!ow || ow.id !== conn.pid || !allowed.includes(m.a)) { log('klick-abgelehnt', {von: (P(conn.pid) || {}).name, aktion: m.a, dran: ow ? ow.name : 'alle'}); return; }
+    act(m.a, +m.i, m.a === 'lukasGo' ? (P(conn.pid) || {}).name : m.v, null);
   }
 }
 function netRefresh(){
@@ -722,7 +730,8 @@ function ownerFx(p, k, v){
   if (p && p.remote && NET.role === 'host' && online(p)) { try { NET.conns[p.id].send({t:'fx', k, v}); } catch {} return; }
   if (k === 'speak') speak(v); else if (k === 'audio') playNotes(v); else if (k === 'sfx') sfx[v] && sfx[v]();
 }
-function netOverlay(html){ NET.overlay = html; if (NET.role === 'host') for (const id in NET.conns) try { NET.conns[id].send({t:'overlay', html}); } catch {} }
+function overlayFor(conn, o){ return o ? (o.forId && o.forId === conn.pid ? o.inter : o.watch) : null; }
+function netOverlay(o){ NET.overlay = o; if (NET.role === 'host') for (const id in NET.conns) try { NET.conns[id].send({t:'overlay', html:overlayFor(NET.conns[id], o), inter: !!(o && o.forId === NET.conns[id].pid)}); } catch {} }
 
 /* --- Lobby (Host) --- */
 function renderLobby(){
@@ -784,7 +793,7 @@ function guestConnect(code, autoId){
     const conn = connectTo(peer, peerId(code)); NET.guestConn = conn;
     conn.on('open', () => { done = true; });
     conn.on('data', m => guestMsg(m, autoId));
-    conn.on('close', () => { if (NET.role === 'guest') guestLost(); });
+    conn.on('close', () => { gLog('getrennt', {}); if (NET.role === 'guest') guestLost(); });
   });
 }
 function guestLost(){
@@ -805,7 +814,7 @@ function guestMsg(m, autoId){
       <div class="spacer"></div><button class="btn ghost wide" data-act="home">Abbrechen</button></section>`;
     return;
   }
-  if (m.t === 'claimed') { const k = store.get('3gq2-me') || {}; k[NET.code] = m.id; store.set('3gq2-me', k); NET.me = m; return; }
+  if (m.t === 'claimed') { gLog('angemeldet', {als: m.name}); const k = store.get('3gq2-me') || {}; k[NET.code] = m.id; store.set('3gq2-me', k); NET.me = m; return; }
   if (m.t === 'err') { renderJoin(m.msg); return; }
   if (m.t === 'wait') {
     app.innerHTML = `<section class="screen"><div class="center"><div class="bigicon">${NET.me ? NET.me.emoji : '✅'}</div><h2>${NET.me ? esc(NET.me.name) : ''}</h2><p>${esc(m.msg)}</p></div></section>`;
@@ -829,7 +838,8 @@ function guestMsg(m, autoId){
   if (m.t === 'text') { const el = $(m.sel); if (el) el.textContent = m.text; return; }
   if (m.t === 'overlay') {
     const old = $('.lukas'); if (old) old.remove();
-    if (m.html) { const el = document.createElement('div'); el.className = 'lukas'; el.innerHTML = m.html; document.body.appendChild(el); sfx.siren(); }
+    if (m.html) { const el = document.createElement('div'); el.className = 'lukas' + (m.inter ? '' : ' watch'); el.innerHTML = m.html; document.body.appendChild(el); sfx.siren(); }
+    gLog('overlay', {an: !!m.html, knopf: !!m.inter});
     return;
   }
   if (m.t === 'fx') {
@@ -846,10 +856,35 @@ function netShutdown(){
   SCREEN_WHO = null;
 }
 
+/* =================== Protokoll =================== */
+function log(type, d){
+  try {
+    const L = store.get('3gq2-log') || [];
+    const t = new Date(); const ts = t.toLocaleDateString('de-DE') + ' ' + t.toLocaleTimeString('de-DE');
+    L.push(`${ts} [${NET.role || 'lokal'}] ${type} ${d ? JSON.stringify(d) : ''}`);
+    store.set('3gq2-log', L.slice(-600));
+  } catch {}
+}
+function gLog(type, d){ log(type, d); if (NET.role === 'guest' && NET.guestConn) { try { NET.guestConn.send({t:'log', d:{typ:type, ...d}}); } catch {} } }
+window.addEventListener('error', e => log('FEHLER', {msg: e.message, zeile: e.lineno}));
+window.addEventListener('unhandledrejection', e => log('FEHLER', {msg: String(e.reason && e.reason.message || e.reason)}));
+function renderLog(){
+  const L = store.get('3gq2-log') || [];
+  const info = `3GenQuiz 2 · ${navigator.userAgent}\n`;
+  app.innerHTML = `<section class="screen">
+    <h2 class="catname" style="font-size:1.6rem">Protokoll</h2>
+    <p class="small">Kopiere den Text und schicke ihn an Claude. Er enthält nur Spielereignisse von diesem Gerät (keine persönlichen Daten außer den Spielernamen).</p>
+    <textarea id="logtext" class="logtext" readonly>${esc(info + (L.length ? L.join('\n') : '(noch leer)'))}</textarea>
+    <button class="btn lila wide" data-act="logCopy">Kopieren</button>
+    <button class="btn ghost wide" data-act="logClear">Protokoll leeren</button>
+    <button class="btn ghost wide" data-act="home">Zurück</button></section>`;
+}
+
 
 function startGame(quick){
   hush(); ensureAudio(); keepAwake();
   const per = quick ? 1 : Math.min(S.perPlayer, maxPer());
+  log('start', {schnell: !!quick, spieler: S.players.map(p => `${p.name}/${p.level}${p.remote ? '/📱' + (online(p) ? 'verbunden' : 'offline') : ''}`)});
   G = { quick, per, total: per * S.players.length, turn:0, cells:Array(25).fill(null), picks:[],
         scores:Object.fromEntries(S.players.map(p => [p.id, 0])), right:Object.fromEntries(S.players.map(p => [p.id, 0])),
         prev:{}, used:[], lukasCount:0, lukasNow:false, phase:'turns', fin:0, q:null };
@@ -936,6 +971,7 @@ function renderSetup(){
     <div class="startbar">
       <button class="btn lila wide" data-act="start">Spiel starten</button>
       <button class="btn ghost wide" data-act="quick">Schnelltest: 1 Frage pro Person + Finale</button>
+      <button class="small oldlink linkbtn" data-act="log">Protokoll anzeigen (für Fehlermeldungen)</button>
       ${/github\.io$/.test(location.hostname) ? `<a class="small oldlink" href="/3genquiz/v1/">Zur alten Version (1)</a>` : ''}
     </div>
   </section>`;
@@ -975,7 +1011,7 @@ function board(){
     ${header(p)}
     <div class="boardhint">${hint}</div>
     <div class="grid" role="grid">
-      <div></div>${COLS.map(c => `<div class="gh col"><span class="e">${c.e}</span>${c.n}</div>`).join('')}
+      <div></div>${COLS.map(c => `<div class="gh col"><span class="e">${c.e}</span>${c.n}${c.half ? '<em class="half">½ Punkte</em>' : ''}</div>`).join('')}
       ${ROWS.map((r,ri) => `<div class="gh row"><span class="e">${r.e}</span>${r.s}</div>${[0,1,2,3,4].map(ci => cell(ri*5+ci)).join('')}`).join('')}
     </div>
     <div class="spacer"></div>
@@ -989,6 +1025,7 @@ function board(){
 function take(){
   const p = cur();
   G.cells[SEL] = p.id; G.picks.push({cell:SEL, pid:p.id});
+  log('feld', {zug: G.turn + 1, spieler: p.name, feld: cellName(SEL), fern: !!p.remote, verbunden: online(p)});
   G.lukasNow = decideLukas(); if (G.lukasNow) G.lukasCount++;
   G.q = G.lukasNow ? physikQ(p.level) : getQuestion(SEL, p.level);
   G.q.cell = SEL; G.q.lukas = G.lukasNow;
@@ -996,19 +1033,25 @@ function take(){
   if (G.lukasNow) lukasOverlay(); else question(p);
 }
 
-function lukasOverlay(){
-  const el = document.createElement('div');
-  el.className = 'lukas';
-  el.innerHTML = `
+function lukasHTML(p, interactive){
+  return `
     <div class="stop">MOMENT MAL!</div>
     ${faceHTML()}
     <h2 class="disp">Lukas’ unerwartete Physikfrage</h2>
-    <p>Statt ${esc(cellName(G.q.cell))}: Physik! Doppelte Punkte.</p>
-    <button class="btn" data-act="lukasGo">Her damit!</button>`;
-  document.body.appendChild(el);
-  sfx.siren(); netOverlay(el.innerHTML);
+    <p>${interactive ? `Statt ${esc(cellName(G.q.cell))}: Physik! Doppelte Punkte.` : `Für ${esc(p.name)} – statt ${esc(cellName(G.q.cell))}. Doppelte Punkte!`}</p>
+    ${interactive ? `<button class="btn" data-act="lukasGo">Her damit!</button>` : `<p class="small-dark">${esc(p.name)} startet die Frage auf dem eigenen Gerät.</p>`}`;
 }
-function lukasGo(){ const el = $('.lukas'); if (!el) return; el.remove(); netOverlay(null); question(cur()); }
+function lukasOverlay(){
+  const p = cur(), remote = p.remote && online(p);
+  const el = document.createElement('div');
+  el.className = 'lukas' + (remote ? ' watch' : '');
+  el.innerHTML = lukasHTML(p, !remote);
+  document.body.appendChild(el);
+  sfx.siren();
+  netOverlay({forId: remote ? p.id : null, inter: lukasHTML(p, true), watch: lukasHTML(p, false)});
+  log('lukas', {an: p.name, fern: !!p.remote, verbunden: remote});
+}
+function lukasGo(from){ const el = $('.lukas'); if (!el) return; log('lukasGo', {von: from || 'Hauptgerät'}); el.remove(); netOverlay(null); question(cur()); }
 
 function bigHTML(b){
   if (!b) return '';
@@ -1025,7 +1068,7 @@ function question(p){
   const limit = lv.t + (q.prompt.length > 140 ? 10 : 0) + (q.audio ? Math.ceil(q.audio.chord ? 3 : melDur(q)) : 0) + (q.big && q.big.html ? 5 : 0);
   const label = fin ? `<span>🧠</span><span>Finale · Memory</span>`
     : q.lukas ? `${faceHTML('lukasmini')}<span>Lukas’ Physikfrage · ×2</span>`
-    : `<span>${ROWS[cellRC(q.cell)[0]].e}${COLS[cellRC(q.cell)[1]].e}</span><span>${esc(cellName(q.cell))}</span>`;
+    : `<span>${ROWS[cellRC(q.cell)[0]].e}${COLS[cellRC(q.cell)[1]].e}</span><span>${esc(cellName(q.cell))}${COLS[cellRC(q.cell)[1]].half ? ' · ½ Punkte' : ''}</span>`;
   paint(`
   <section class="screen">
     ${header(p)}
@@ -1085,10 +1128,12 @@ function answer(i){
     const speed = Math.max(0, (q.limit - el) / q.limit);
     gain = fin ? Math.round(1500 + 500 * speed) : Math.round(500 + 500 * speed);
     if (q.lukas) gain *= 2;
+    else if (!fin && COLS[cellRC(q.cell)[1]].half) gain = Math.round(gain / 2);   // 1. Klasse: halbe Punkte
     if (!fin) G.right[p.id]++;
   }
   G.scores[p.id] += gain;
   G.done = fin ? 'F'+G.fin : 'T'+G.turn;
+  log('antwort', {spieler: p.name, finale: fin, lukas: !!q.lukas, richtig: ok, punkte: gain, frage: q.prompt.slice(0, 60)});
   ownerFx(p, 'sfx', ok ? 'ok' : 'no'); if (p.remote) ok ? sfx.ok() : sfx.no();
   let next;
   if (fin) next = G.fin < S.players.length - 1 ? `Weiter zu ${esc(S.players[G.fin+1].name)}` : 'Zur Siegerehrung';
@@ -1100,7 +1145,7 @@ function answer(i){
     <div class="center">
       <h2 class="verdict ${ok?'ok':'no'} pop">${ok ? 'Richtig!' : i < 0 ? 'Zeit ist um!' : 'Leider falsch'}</h2>
       <div class="gain">+${gain}</div>
-      ${ok ? '' : `<div class="solution">Richtig wäre: ${sol}</div>`}
+      <div class="solution">${ok ? 'Lösung' : 'Richtig wäre'}: ${sol}</div>
       ${ok && q.lukas ? '<p class="small">Doppelte Punkte dank Lukas!</p>' : ''}
     </div>
     <button class="btn lila wide" data-act="next">${next}</button>
@@ -1212,7 +1257,7 @@ function resume(){
 }
 
 /* =================== Ereignisse =================== */
-const GUEST_LOCAL = ['home','join','joinGo','claim','rejoin'];
+const GUEST_LOCAL = ['home','join','joinGo','claim','rejoin','log','logCopy','logClear'];
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.closest('.mirror')) return;                                   // Spiegelbild: nur anschauen
@@ -1248,8 +1293,11 @@ function act(act, i, v, b){
     case 'joinGo': guestConnect(($('#joincode') || {}).value); break;
     case 'claim': try { NET.guestConn.send({t:'claim', id:v}); } catch {} break;
     case 'rejoin': guestConnect(NET.code || store.get('3gq2-lastcode')); break;
-    case 'takeover': { const ow = screenOwner(); if (ow) { ow.remote = false; save(); repaint(true); } break; }
-    case 'lukasGo': lukasGo(); break;
+    case 'takeover': { const ow = screenOwner(); if (ow) { log('übernommen', {spieler: ow.name}); ow.remote = false; save(); repaint(true); } break; }
+    case 'lukasGo': lukasGo(v); break;
+    case 'log': renderLog(); break;
+    case 'logCopy': { const t = $('#logtext'); if (t) { t.select(); try { navigator.clipboard.writeText(t.value).then(() => { B.textContent = 'Kopiert ✓'; }, () => {}); } catch {} } break; }
+    case 'logClear': store.set('3gq2-log', []); renderLog(); break;
     case 'resume': resume(); break;
     case 'ready': G.phase === 'finale' ? finaleIntro() : board(); break;
     case 'cell': SEL = i; sfx.tick(); board(); break;
