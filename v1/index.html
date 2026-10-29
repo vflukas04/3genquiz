@@ -1,0 +1,900 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#24113c"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.45 system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>3GenQuiz</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: eine Quizshow-Bühne in VfL-Lila; ein Handy wird reihum gereicht, jede Ansicht füllt genau einen Bildschirm.
+   Bewusst nur ein (dunkles) Erscheinungsbild, unabhängig vom System-Theme. */
+:root{
+  --stage:#24113c; --stage-2:#311857; --panel:#3c2066; --line:#5a3a8a;
+  --ink:#fff8ef; --muted:#cbb9e8; --lila:#a56ff2; --lila-soft:#7d4bc7;
+  --t1:#ff6b57; --t2:#2cc4b2; --t3:#ffc233; --t4:#5f8fff; --tile-ink:#1b0a30;
+  --ok:#3fdc86; --bad:#ff5a74;
+  --font-display:'Fredoka','Baloo 2',ui-rounded,system-ui,sans-serif;
+  --font-body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --emoji:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  background-color:var(--stage);
+  background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,.06) 1px, transparent 0);
+  background-size:22px 22px;
+  color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+  overflow-x:hidden; -webkit-tap-highlight-color:transparent;
+}
+#app{min-height:100%; max-width:560px; margin:0 auto; display:flex; flex-direction:column; padding-block:14px 18px}
+.screen{flex:1; display:flex; flex-direction:column; gap:16px; min-height:0}
+h1,h2,h3,.disp{font-family:var(--font-display); font-weight:600; text-wrap:balance; margin:0; line-height:1.15}
+button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
+button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid var(--t3); outline-offset:2px}
+.btn{font-family:var(--font-display); font-weight:600; font-size:1.25rem; padding:16px 22px; border-radius:16px;
+  background:var(--ink); color:var(--tile-ink); box-shadow:0 5px 0 rgba(0,0,0,.35); transition:transform .08s}
+.btn:active{transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.btn.lila{background:var(--lila); color:var(--tile-ink)}
+.btn.ghost{background:transparent; color:var(--ink); box-shadow:inset 0 0 0 2px var(--line)}
+.btn.wide{width:100%}
+.small{font-size:.85rem; color:var(--muted)}
+.label{font-size:.75rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700}
+.spacer{flex:1}
+
+/* ---------- Setup ---------- */
+.brand{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; padding-top:6px}
+.brand h1{font-size:2.6rem; font-weight:700; letter-spacing:-.01em}
+.brand h1 span{color:var(--lila)}
+.gens{font-family:var(--font-display); color:var(--muted); font-size:1rem; text-align:right}
+.block{display:flex; flex-direction:column; gap:10px}
+.prow{display:grid; grid-template-columns:52px 1fr auto auto; gap:8px; align-items:center;
+  background:var(--stage-2); border-radius:14px; padding:8px}
+.prow input[type=text]{min-width:0; width:100%; background:transparent; border:0; border-bottom:2px solid var(--line);
+  color:var(--ink); font:inherit; font-size:1.1rem; padding:6px 2px}
+.av{font-family:var(--emoji); font-size:1.9rem; width:52px; height:52px; border-radius:12px; background:var(--panel)}
+.seg{display:inline-flex; background:var(--panel); border-radius:10px; padding:3px}
+.seg button{padding:7px 10px; border-radius:8px; font-size:.85rem; font-weight:700; color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--ink); color:var(--tile-ink)}
+.iconbtn{width:38px; height:38px; border-radius:10px; font-size:1.1rem; color:var(--muted)}
+.iconbtn[aria-pressed=true]{background:var(--panel); color:var(--ink)}
+.prow .opts{display:flex; gap:4px; align-items:center}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{padding:9px 13px; border-radius:999px; box-shadow:inset 0 0 0 2px var(--line); font-weight:700; font-size:.92rem; color:var(--muted)}
+.chip[aria-pressed=true]{background:var(--lila); color:var(--tile-ink); box-shadow:none}
+.chip:disabled{opacity:.45; cursor:default}
+.chip .e{font-family:var(--emoji); margin-right:4px}
+.lukasbox{display:flex; gap:14px; align-items:center; background:var(--stage-2); border-radius:14px; padding:12px}
+.face{width:72px; height:72px; border-radius:50%; flex:none; object-fit:cover; background:var(--lila-soft);
+  display:grid; place-items:center; font-family:var(--font-display); font-size:2rem; color:var(--ink); box-shadow:0 0 0 3px var(--ink)}
+.lukasbox .txt{display:flex; flex-direction:column; gap:6px; min-width:0}
+.filebtn{display:inline-flex; gap:8px; flex-wrap:wrap}
+.filebtn label{padding:8px 12px; border-radius:10px; background:var(--panel); font-weight:700; font-size:.9rem; cursor:pointer}
+.filebtn input{position:absolute; opacity:0; width:1px; height:1px}
+.notice{background:rgba(255,194,51,.12); border:1px solid rgba(255,194,51,.4); border-radius:12px; padding:10px 12px; font-size:.9rem}
+.startbar{display:flex; flex-direction:column; gap:10px; padding-top:6px}
+
+/* ---------- Game header ---------- */
+.ghead{display:flex; align-items:center; gap:10px; min-height:40px}
+.ghead .who{display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-size:1.1rem; min-width:0}
+.ghead .who .e{font-family:var(--emoji); font-size:1.5rem}
+.ghead .who b{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pts{font-variant-numeric:tabular-nums; background:var(--stage-2); border-radius:999px; padding:4px 12px; font-weight:700}
+.quit{margin-left:auto; padding:6px 10px; border-radius:10px; font-size:.85rem; color:var(--muted); box-shadow:inset 0 0 0 2px var(--line)}
+.quit.armed{background:var(--bad); color:var(--tile-ink); box-shadow:none}
+
+/* ---------- Round intro / handover ---------- */
+.center{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:14px}
+.bigicon{font-family:var(--emoji); font-size:5.5rem; line-height:1}
+.catname{font-size:2.3rem}
+.handover .bigicon{font-size:6.5rem; animation:bob 1.6s ease-in-out infinite}
+.handover h2{font-size:2.2rem}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-4deg)}}
+.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.4); opacity:0}}
+
+/* ---------- Question ---------- */
+.qcat{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.qcat .label{display:flex; align-items:center; gap:6px}
+.speak{width:46px; height:46px; border-radius:50%; background:var(--panel); font-family:var(--emoji); font-size:1.3rem}
+.qtext.long{font-size:1.2rem!important; line-height:1.3}
+.qtext{font-size:1.65rem; font-family:var(--font-display); font-weight:600; text-wrap:balance}
+.bigshow{display:grid; place-items:center; min-height:120px; background:var(--stage-2); border-radius:18px; padding:12px; text-align:center}
+.bigshow .em{font-family:var(--emoji); font-size:4.6rem; line-height:1.1; word-break:break-word}
+.bigshow .em.flag{font-size:7.5rem}
+.bigshow .em.many{font-size:2.6rem; letter-spacing:.08em}
+.bigshow .tx{font-family:var(--font-display); font-size:2.1rem; font-variant-numeric:tabular-nums}
+.timer{height:12px; background:var(--stage-2); border-radius:999px; overflow:hidden}
+.timer i{display:block; height:100%; width:100%; background:var(--ink); transform-origin:left; border-radius:999px}
+.timer.low i{background:var(--bad)}
+.tiles{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:6px}
+.tile{position:relative; min-height:110px; border-radius:16px; padding:14px 14px 14px 36px; text-align:left;
+  color:var(--tile-ink); font-weight:700; font-size:1.15rem; line-height:1.2; box-shadow:0 5px 0 rgba(0,0,0,.35)}
+.tile:active{transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.tile .sh{position:absolute; left:12px; top:12px; font-size:.95rem; opacity:.55}
+.tile.e{font-family:var(--emoji); font-size:2.6rem; text-align:center; padding:10px}
+.tile.c0{background:var(--t1)} .tile.c1{background:var(--t2)} .tile.c2{background:var(--t3)} .tile.c3{background:var(--t4)}
+.tile.dim{opacity:.3} .tile.right{outline:4px solid var(--ink)}
+.memgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+.memgrid div{aspect-ratio:1; max-width:100%; display:grid; place-items:center; background:var(--stage-2); border-radius:16px; font-family:var(--emoji); font-size:3rem}
+.count{font-family:var(--font-display); font-size:3rem; font-variant-numeric:tabular-nums}
+
+/* ---------- Feedback ---------- */
+.verdict{font-size:2.6rem}
+.verdict.ok{color:var(--ok)} .verdict.no{color:var(--bad)}
+.gain{font-family:var(--font-display); font-size:3.2rem; font-variant-numeric:tabular-nums}
+.solution{background:var(--stage-2); border-radius:14px; padding:12px 16px; font-size:1.15rem}
+.solution b{font-family:var(--font-body)}
+.solution .em{font-family:var(--emoji)}
+
+/* ---------- Scoreboard ---------- */
+.board{display:flex; flex-direction:column; gap:10px}
+.brow{display:grid; grid-template-columns:30px 40px 1fr; gap:8px; align-items:center}
+.brow .rk{font-family:var(--font-display); font-size:1.4rem; color:var(--muted); text-align:center}
+.brow .e{font-family:var(--emoji); font-size:1.8rem}
+.bar{position:relative; background:var(--stage-2); border-radius:12px; height:48px; overflow:hidden; min-width:0}
+.bar i{position:absolute; inset:0 auto 0 0; background:var(--lila); border-radius:12px; transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.bar span{position:relative; display:flex; justify-content:space-between; align-items:center; height:100%; padding:0 12px; font-weight:700; gap:8px}
+.bar span em{font-style:normal; font-variant-numeric:tabular-nums}
+.podium{display:flex; align-items:flex-end; justify-content:center; gap:10px; padding-top:12px}
+.pod{display:flex; flex-direction:column; align-items:center; gap:6px; width:30%; max-width:140px}
+.pod .e{font-family:var(--emoji); font-size:2.6rem}
+.pod .blk{width:100%; border-radius:12px 12px 0 0; display:grid; place-items:start center; padding-top:8px; font-family:var(--font-display); font-size:1.8rem; color:var(--tile-ink)}
+.pod.p1 .blk{height:150px; background:var(--t3)} .pod.p2 .blk{height:110px; background:var(--muted)} .pod.p3 .blk{height:80px; background:var(--t1)}
+.pod .nm{font-weight:700; text-align:center; word-break:break-word}
+.pod .sc{font-size:.9rem; color:var(--muted); font-variant-numeric:tabular-nums}
+#confetti{position:fixed; inset:0; pointer-events:none; z-index:30}
+
+/* ---------- Lukas overlay ---------- */
+.lukas{position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+  background:repeating-conic-gradient(from 0deg, #ffc233 0 10deg, #ffb000 10deg 20deg); color:var(--tile-ink); text-align:center;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px))}
+.lukas .stop{font-family:var(--font-display); font-size:2.8rem; font-weight:700; letter-spacing:.02em; animation:shake .5s 2}
+.lukas .face{width:min(52vw,220px); height:min(52vw,220px); font-size:5rem; box-shadow:0 0 0 8px var(--tile-ink), 0 0 0 16px #fff;
+  animation:spinin 1s cubic-bezier(.2,1.4,.4,1) both}
+.lukas h2{font-size:2rem; max-width:20ch}
+.lukas p{margin:0; font-weight:700; font-size:1.1rem}
+.lukas .btn{background:var(--tile-ink); color:var(--ink)}
+@keyframes spinin{from{transform:scale(0) rotate(-540deg)}}
+@keyframes shake{25%{transform:translateX(-8px) rotate(-3deg)}75%{transform:translateX(8px) rotate(3deg)}}
+.lukasmini{width:34px; height:34px; font-size:1rem; box-shadow:0 0 0 2px var(--t3)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important; transition:none!important}
+}
+@media (max-width:380px){
+  .qtext{font-size:1.5rem} .tile{min-height:100px; font-size:1.1rem} .brand h1{font-size:2.2rem}
+  .prow{grid-template-columns:46px 1fr auto; row-gap:4px} .prow .opts{grid-column:2/-1; grid-row:2; justify-content:flex-start}
+  .prow > :last-child{grid-column:3; grid-row:1}
+}
+</style>
+
+<div id="app"></div>
+<canvas id="confetti" hidden></canvas>
+
+<script>
+(() => {
+'use strict';
+/* =================== Hilfsfunktionen =================== */
+const $ = s => document.querySelector(s);
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sample = (a, n) => shuffle(a).slice(0, n);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const flag = code => String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+const store = {
+  get(k){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+/* =================== Inhalte =================== */
+// Flaggen: [ISO-Code, Name, Stufe] – Stufe 1 = Kind, 2 = Erwachsene
+const COUNTRIES = [
+ ['DE','Deutschland',1],['FR','Frankreich',1],['IT','Italien',1],['ES','Spanien',1],['GB','Großbritannien',1],['AT','Österreich',1],
+ ['CH','Schweiz',1],['NL','Niederlande',1],['US','USA',1],['BR','Brasilien',1],['JP','Japan',1],['TR','Türkei',1],['GR','Griechenland',1],
+ ['DK','Dänemark',1],['SE','Schweden',1],['CA','Kanada',1],['CN','China',1],['PL','Polen',1],
+ ['BE','Belgien',2],['IE','Irland',2],['PT','Portugal',2],['NO','Norwegen',2],['FI','Finnland',2],['CZ','Tschechien',2],['HU','Ungarn',2],
+ ['HR','Kroatien',2],['AR','Argentinien',2],['MX','Mexiko',2],['AU','Australien',2],['NZ','Neuseeland',2],['KR','Südkorea',2],['IN','Indien',2],
+ ['ZA','Südafrika',2],['EG','Ägypten',2],['CO','Kolumbien',2],['EC','Ecuador',2],['VE','Venezuela',2],['CL','Chile',2],['RO','Rumänien',2],
+ ['IS','Island',2],['EE','Estland',2],['LV','Lettland',2],['LT','Litauen',2],['SI','Slowenien',2],['SK','Slowakei',2],['RS','Serbien',2],
+ ['RU','Russland',2],['BG','Bulgarien',2],['UA','Ukraine',2],['MA','Marokko',2],['NG','Nigeria',2],['KE','Kenia',2],['TH','Thailand',2],
+ ['VN','Vietnam',2],['PE','Peru',2],['UY','Uruguay',2],['JM','Jamaika',2],['LU','Luxemburg',2],['ID','Indonesien',2],['MC','Monaco',2]
+];
+const CNAME = Object.fromEntries(COUNTRIES.map(c => [c[0], c[1]]));
+// Verwechslungsgefahr – Erwachsene bekommen ähnliche Flaggen als falsche Antworten
+const LOOKALIKE = [['AU','NZ'],['NO','IS','DK','FI','SE'],['NL','LU','FR','RU'],['IE','IT','MX','HU','BG'],
+  ['SI','SK','RS','HR','RU'],['CO','EC','VE'],['ID','MC','PL'],['EE','LT','LV'],['RO','BE','DE']];
+
+// Hauptstädte: [Code, Land, Hauptstadt, Stufe, Falle (große Stadt, aber nicht Hauptstadt)]
+const CAPITALS = [
+ ['DE','Deutschland','Berlin',1],['FR','Frankreich','Paris',1],['IT','Italien','Rom',1],['ES','Spanien','Madrid',1],
+ ['GB','Großbritannien','London',1],['AT','Österreich','Wien',1],['GR','Griechenland','Athen',1],['JP','Japan','Tokio',1],
+ ['CH','Schweiz','Bern',2,'Zürich'],['NL','Niederlande','Amsterdam',2,'Rotterdam'],['BE','Belgien','Brüssel',2,'Antwerpen'],
+ ['PT','Portugal','Lissabon',2,'Porto'],['PL','Polen','Warschau',2,'Krakau'],['CZ','Tschechien','Prag',2,'Brünn'],
+ ['HU','Ungarn','Budapest',2],['DK','Dänemark','Kopenhagen',2,'Aarhus'],['SE','Schweden','Stockholm',2,'Göteborg'],
+ ['NO','Norwegen','Oslo',2,'Bergen'],['FI','Finnland','Helsinki',2],['IE','Irland','Dublin',2,'Cork'],
+ ['TR','Türkei','Ankara',2,'Istanbul'],['CA','Kanada','Ottawa',2,'Toronto'],['AU','Australien','Canberra',2,'Sydney'],
+ ['BR','Brasilien','Brasília',2,'Rio de Janeiro'],['AR','Argentinien','Buenos Aires',2],['EG','Ägypten','Kairo',2,'Alexandria'],
+ ['HR','Kroatien','Zagreb',2,'Split'],['SI','Slowenien','Ljubljana',2],['IS','Island','Reykjavík',2],
+ ['US','USA','Washington, D.C.',2,'New York'],['NZ','Neuseeland','Wellington',2,'Auckland'],['MA','Marokko','Rabat',2,'Casablanca'],
+ ['KE','Kenia','Nairobi',2,'Mombasa'],['KR','Südkorea','Seoul',2,'Busan'],['IN','Indien','Neu-Delhi',2,'Mumbai'],
+ ['RO','Rumänien','Bukarest',2],['BG','Bulgarien','Sofia',2],['EE','Estland','Tallinn',2],['UA','Ukraine','Kyjiw',2,'Odessa'],
+ ['SK','Slowakei','Bratislava',2],['RS','Serbien','Belgrad',2],['CL','Chile','Santiago de Chile',2],['PE','Peru','Lima',2],
+ ['TH','Thailand','Bangkok',2],['VN','Vietnam','Hanoi',2,'Ho-Chi-Minh-Stadt']
+];
+const STATES = [
+ ['Niedersachsen','Hannover','Osnabrück'],['Bayern','München','Nürnberg'],['Baden-Württemberg','Stuttgart','Karlsruhe'],
+ ['Nordrhein-Westfalen','Düsseldorf','Köln'],['Hessen','Wiesbaden','Frankfurt am Main'],['Rheinland-Pfalz','Mainz','Koblenz'],
+ ['Saarland','Saarbrücken'],['Sachsen','Dresden','Leipzig'],['Sachsen-Anhalt','Magdeburg','Halle (Saale)'],['Thüringen','Erfurt','Jena'],
+ ['Brandenburg','Potsdam','Cottbus'],['Mecklenburg-Vorpommern','Schwerin','Rostock'],['Schleswig-Holstein','Kiel','Lübeck']
+];
+
+// Statische Fragen: [Stufe, Bild, Frage, richtige Antwort, ...falsche]
+const Q = {
+ klasse1: [
+  [1,'🕷️','Wie viele Beine hat eine Spinne?','8','6','4','10'],
+  [1,'🔺','Wie viele Ecken hat ein Dreieck?','3','4','5','2'],
+  [1,'🎨','Welche Farbe entsteht, wenn man Blau und Gelb mischt?','Grün','Rot','Lila','Orange'],
+  [1,'📅','Welcher Tag kommt nach Montag?','Dienstag','Sonntag','Mittwoch','Freitag'],
+  [1,'📆','Wie viele Tage hat eine Woche?','7','5','10','12'],
+  [1,'🏠','Welches Wort reimt sich auf „Haus“?','Maus','Hund','Baum','Hose'],
+  [1,'☀️','Mit welchem Buchstaben beginnt „Sonne“?','S','O','N','Z'],
+  [1,'🔤','Welcher Buchstabe kommt im ABC nach B?','C','A','D','P'],
+  [1,'🥚','Welches Tier legt Eier?','Huhn','Kuh','Hund','Pferd'],
+  [1,'🤔','Was ist mehr?','21','12'],
+  [1,'🗓️','Wie viele Monate hat ein Jahr?','12','10','7','24'],
+  [1,'❄️','Welche Jahreszeit kommt nach dem Winter?','Frühling','Sommer','Herbst'],
+  [1,'🌱','Was brauchen Pflanzen zum Wachsen?','Wasser und Licht','Saft und Kekse','Nur Dunkelheit','Sand und Steine'],
+  [1,'🖐️','Wie viele Finger hast du an beiden Händen zusammen?','10','8','5','12'],
+  [1,'🤔','Welches Wort ist ein Tier?','Igel','Tisch','Gabel','Mond'],
+  [1,'🚦','Bei welcher Ampelfarbe darfst du über die Straße gehen?','Grün','Rot','Gelb','Blau'],
+  [1,'🔢','Welche Zahl ist die kleinste?','3','8','13','30'],
+  [1,'📖','Wie viele Buchstaben hat das Wort „Ball“?','4','3','5','6']
+ ],
+ physik: [
+  [1,'🧊','Was passiert mit einem Eiswürfel in der Sonne?','Er schmilzt','Er wird größer','Er wird zu Stein','Er fliegt weg'],
+  [1,'🪶','Was ist schwerer: 1 kg Federn oder 1 kg Steine?','Beide gleich schwer','Die Steine','Die Federn'],
+  [1,'🧲','Was zieht ein Magnet an?','Einen Eisennagel','Ein Holzstück','Ein Blatt Papier','Einen Plastiklöffel'],
+  [1,'🍎','Warum fällt ein Apfel vom Baum nach unten?','Wegen der Schwerkraft','Weil er müde ist','Wegen des Windes','Weil er hüpfen will'],
+  [1,'🛁','Was schwimmt im Wasser oben?','Ein Korken','Ein Stein','Ein Schlüssel','Eine Murmel'],
+  [1,'🌈','Wann kannst du einen Regenbogen sehen?','Wenn die Sonne scheint und es regnet','Nur nachts','Wenn es schneit','Bei dichtem Nebel'],
+  [1,'🌙','Warum leuchtet der Mond?','Die Sonne strahlt ihn an','Er hat eine Lampe','Er brennt','Die Sterne leuchten ihn an'],
+  [1,'⛈️','Was kommt bei einem Gewitter zuerst bei dir an?','Der Blitz','Der Donner','Beides gleichzeitig'],
+  [2,'☀️','Wie lange braucht Sonnenlicht ungefähr bis zur Erde?','Etwa 8 Minuten','Etwa 8 Sekunden','Etwa 8 Stunden','Etwa 1 Tag'],
+  [2,'🔨','Feder und Hammer fallen im Vakuum. Was kommt zuerst unten an?','Beide gleichzeitig','Der Hammer','Die Feder'],
+  [2,'💪','In welcher Einheit misst man Kraft?','Newton','Watt','Joule','Pascal'],
+  [2,'🏔️','Bei ungefähr welcher Temperatur kocht Wasser auf dem Mount Everest?','Etwa 70 °C','Etwa 100 °C','Etwa 120 °C','Etwa 40 °C'],
+  [2,'🌤️','Warum ist der Himmel tagsüber blau?','Blaues Licht wird in der Luft stärker gestreut','Er spiegelt das Meer','Die Luft ist blau gefärbt','Ozon leuchtet blau'],
+  [2,'💡','Wie schnell ist Licht ungefähr?','300.000 km pro Sekunde','300 km pro Sekunde','30.000 km pro Stunde','3 Mio. km pro Sekunde'],
+  [2,'🥶','Wo liegt der absolute Nullpunkt (gerundet)?','−273 °C','−100 °C','0 °C','−459 °C'],
+  [2,'📻','Was misst man in Hertz?','Frequenz','Lautstärke','Stromstärke','Druck'],
+  [2,'🚀','Warum hört man im Weltall keinen Knall?','Dort gibt es keine Luft, die den Schall trägt','Es ist zu kalt','Die Sterne schlucken ihn','Schall ist dort zu langsam'],
+  [2,'🔦','Welche Lichtfarbe hat die kürzeste Wellenlänge?','Violett','Rot','Grün','Gelb']
+ ],
+ vfl: [
+  // ---- Kind (Stufe 1) ----
+  [1,'💜','Welche Farben hat der VfL Osnabrück?','Lila und Weiß','Blau und Weiß','Rot und Schwarz','Grün und Weiß'],
+  [1,'🧸','Wie heißen die beiden Maskottchen vom VfL?','Li und La','Bim und Bam','Max und Moritz'],
+  [1,'🔷','Welche Form hat das VfL-Zeichen?','Eine Raute','Ein Kreis','Ein Stern','Ein Rad'],
+  [1,'🏟️','Wie heißt das Stadion vom VfL?','Bremer Brücke','Allianz Arena','Weserstadion'],
+  [1,'📣','In welcher Kurve stehen die VfL-Fans und singen?','Ostkurve','Nordkurve','Südkurve'],
+  [1,'🎵','„Wir sind alle ein Stück …“ – wie geht das VfL-Lied weiter?','VfL Osnabrück','Schokolade','Bremer Brücke'],
+  [1,'📜','In welchem Jahr wurde der VfL gegründet?','1899','1999','1950','2010'],
+  [1,'📈','In welcher Liga spielt der VfL gerade?','2. Bundesliga','1. Bundesliga','Kreisliga','Champions League'],
+  [1,'📋','Wie heißt der Trainer vom VfL?','Timo Schultz','Joe Enochs','Daniel Thioune','Marco Antwerpen'],
+  [1,'🎖️','Wer ist der Kapitän vom VfL?','Jannik Müller','Robin Meißner','Jonas Krumrey','Konrad Faber'],
+  [1,'🔟','Welche Rückennummer hat Stürmer Robin Meißner?','11','7','10','24'],
+  [1,'🧤','Welche Rückennummer hat Torwart Jonas Krumrey?','32','1','11','7'],
+  [1,'🏆','Gegen welchen großen Verein hat der VfL diese Saison im Pokal gespielt?','FC Bayern München','Borussia Dortmund','Real Madrid','FC Barcelona'],
+  [1,'⚽','Wer hat diese Saison die meisten Tore für den VfL geschossen?','Robin Meißner','Jannik Müller','Jonas Krumrey','Niklas Sauter'],
+  [1,'🎉','Wie ging das Heimspiel gegen Braunschweig aus?','VfL gewinnt 3:1','0:0','VfL verliert 1:3','2:2'],
+  // ---- Erwachsene (Stufe 2): Verein ----
+  [2,'🤝','Dirk, Gert, Hermann und Holger sprechen über ihre Zeit als VfL-Präsident. Wer fehlt in dieser Runde?','Hülsmann','Rasch','Lehker','Elixmann'],
+  [2,'🤝','Manfred, Christian, Hermann und Dirk sprechen über ihre Zeit als VfL-Präsident. Wer fehlt in dieser Runde?','Lehker','Hülsmann','Kröger','Queckenstedt'],
+  [2,'📋','Jürgen, Karsten, Maik und Timo sprechen über ihre Zeit als VfL-Cheftrainer. Wer fehlt in dieser Runde?','Schweinsteiger','Gelsdorf','Baumann','Walpurgis'],
+  [2,'🏛️','Welchen Beruf hatte Hermann Queckenstedt, als er 2014 VfL-Präsident wurde?','Leiter des Diözesanmuseums','BWL-Professor','Chef der Stadtwerke','Bankdirektor'],
+  [2,'🗳️','Wer führte den VfL 2014 nach dem Rücktritt des Präsidenten kommissarisch?','Christoph Ehrenberg','Uwe Brunn','Gert Lehker','Manfred Hülsmann'],
+  [2,'🧭','Welcher frühere VfL-Spieler und -Trainer ist seit Juni 2025 „Direktor Fußball“?','Joe Enochs','Lothar Gans','Daniel Thioune','Marc Heider'],
+  [2,'🔍','Wer folgte Ende 2017 auf Lothar Gans als Sportdirektor?','Benjamin Schmedes','Amir Shapourzadeh','Philipp Kaufmann','Jürgen Wehlend'],
+  [2,'🚚','Zu welchem Verein wechselte VfL-Geschäftsführer Jürgen Wehlend Anfang 2021?','Dynamo Dresden','Hannover 96','Arminia Bielefeld','Preußen Münster'],
+  [2,'🔄','Wie viele verschiedene Cheftrainer (ohne Interimstrainer) hatte der VfL im Jahr 2024?','3','2','4','5'],
+  [2,'🏆','Welcher Trainer führte den VfL 2026 als Meister in die 2. Bundesliga?','Timo Schultz','Tobias Schweinsteiger','Daniel Thioune','Marco Antwerpen'],
+  [2,'🔤','Wofür steht „VfL“?','Verein für Leibesübungen','Verein für Lilafans','Verband freier Ligen','Volksfest-Liga'],
+  // Trikot, Stadion, Zahlen
+  [2,'👕','Welches Produkt hat KEIN Brustsponsor des VfL seit 2001 angeboten?','Autos','Bier','Sportwetten','Möbelbeschläge'],
+  [2,'👕','Was stand 2014/15 statt eines Firmennamens auf der Trikotbrust?','„Wir sind die Osnabrücker“','„Lila-Weiß für immer“','„Friedensstadt Osnabrück“','„Bremer Brücke“'],
+  [2,'🛒','Wer ist seit 2026/27 Trikotsponsor des VfL?','Thomas Philipps','SO-TECH','Herforder','sunmaker'],
+  [2,'🧵','Welcher Ausrüster hat den VfL seit 2001 NIE ausgestattet?','Jako','Uhlsport','Umbro','Capelli Sport'],
+  [2,'🏟️','Wie hieß das Stadion an der Bremer Brücke von 2004 bis 2016?','osnatel-Arena','Piepenbrock-Stadion','Herforder-Arena','Sparkassen-Arena'],
+  [2,'👥','Welche Mitgliedermarke hat der VfL im Juli 2026 geknackt?','10.000','5.000','15.000','25.000'],
+  [2,'📊','Wie viele Zuschauer kamen 2025/26 insgesamt zu den VfL-Heimspielen (Vereinsrekord)?','rund 282.000','rund 150.000','rund 220.000','rund 350.000'],
+  [2,'🥇','Wie oft war der VfL bis 2026 Meister der 3. Liga?','3-mal','1-mal','2-mal','4-mal'],
+  [2,'📈','Mit wie vielen Punkten wurde der VfL 2025/26 Meister der 3. Liga?','80','76','72','69'],
+  // Spiele
+  [2,'🧤','Ein Ex-HSV-Profi verschoss 2009 im Pokal-Elfmeterschießen gegen den VfL – und schoss 2026 in Wiesbaden das 3:2 für den VfL. Wer?','Robert Tesche','Mladen Petrić','Piotr Trochowski','Eljero Elia'],
+  [2,'⚡','Pokal-Achtelfinale 2009, VfL – Dortmund 3:2: Wer schoss beide Tore zur 2:0-Pausenführung?','Angelo Barletta','Benjamin Siegert','Niels Hansen','Thomas Reichenberger'],
+  [2,'🟥','Pokal 2017 gegen den HSV: Ein VfL-Spieler sieht in der 18. Minute Rot – trotzdem gewinnt der VfL 3:1. Wer flog vom Platz?','Marcel Appiah','Halil Savran','Marc Heider','Ahmet Arslan'],
+  [2,'⏱️','Letzter Spieltag, Tor in der 6. Minute der Nachspielzeit, Aufstieg mit einem Tor Vorsprung vor Wehen Wiesbaden. Welche Saison?','2022/23','2018/19','2009/10','2025/26'],
+  [2,'⏱️','Wer schoss 2023 gegen Dortmund II in der 90.+6 Minute das Aufstiegstor zum 2:1?','Jannes Wulff','Ba-Muaka Simakala','Erik Engelhardt','Robin Meißner'],
+  [2,'💔','Relegation 2011 gegen Dresden: Wer schoss Dynamo in der 119. Minute an der Bremer Brücke in die 2. Liga?','Robert Koch','Dani Schahin','Cristian Fiél','Idir Ouali'],
+  [2,'💔','Gegen wen verlor der VfL 2009 beide Relegationsspiele jeweils 0:1?','SC Paderborn','Dynamo Dresden','FC Ingolstadt','Union Berlin'],
+  [2,'⚽','Relegation 2021 gegen Ingolstadt: Wer traf im Rückspiel doppelt – doch das 3:1 reichte nicht?','Marc Heider','Etienne Amenyido','Benjamin Girth','Halil Savran'],
+  [2,'🚀','Pokal 2026 gegen Bayern: Wer brachte den VfL mit einem Fernschuss 1:0 in Führung?','Robin Meißner','Ismail Badjie','Robert Tesche','Jannes Wulff'],
+  // Spieler
+  [2,'🌍','Wer kickte 2011/12 in Osnabrück und spielte später u. a. für Dortmund, Leverkusen und Leipzig?','Kevin Kampl','Elias Kachunga','Simon Zoller','Patrick Owomoyela'],
+  [2,'🏆','Welcher Ex-VfL-Spieler wurde mit Dortmund zweimal Deutscher Meister?','Patrick Owomoyela','Kevin Kampl','Simon Zoller','Elias Kachunga'],
+  [2,'🌍','Welcher VfL-Neuzugang 2026 spielte bei der WM 2022?','Daniel-Kofi Kyereh','Robin Meißner','Konrad Faber','Adrian Beck'],
+  [2,'🎯','Wer war 2011/12 mit 10 Toren bester VfL-Torschütze?','Elias Kachunga','Simon Zoller','Marcos Álvarez','Kwasi Wriedt'],
+  [2,'🎓','Welcher frühere VfL-Spieler führte den Verein 2019 als Trainer zur Drittliga-Meisterschaft?','Daniel Thioune','Joe Enochs','Claus-Dieter Wollitz','Maik Walpurgis'],
+  // Freigabe 20.10.2026
+  [2,'🐒','Wie heißt der Stehplatzbereich in der Nordost-Ecke der Bremer Brücke?','Affenfelsen','Lila Wand','Brückenkopf','Gelbe Wand'],
+  [2,'🏟️','In welches Stadion musste der VfL sein Heimspiel gegen Schalke im Mai 2024 verlegen?','Millerntor-Stadion','Volksparkstadion','Heinz-von-Heiden-Arena','Benteler-Arena'],
+  [2,'🔥','Pokal 2015 gegen RB Leipzig: In welcher Minute wurde das Spiel nach einem Feuerzeugwurf auf den Schiedsrichter abgebrochen?','71.','61.','81.','45.'],
+  [2,'🎉','Aufstieg 2007, letzter Spieltag gegen Ahlen: Wer schoss in der 86. Minute das 2:1?','Thomas Reichenberger','Thomas Cichon','Daniel Chitsulo','Angelo Barletta'],
+  [1,'👧','Wie heißt die Tribüne, auf der Kinder ohne Eltern im Stadion sitzen dürfen?','Joe Enochs Kindertribüne','Li-und-La-Tribüne','Lila Kinderkurve'],
+  [2,'🎸','Welcher Song lief NICHT in der früheren Einlaufmusik an der Bremer Brücke?','Highway to Hell','Hells Bells','Das Boot','Thunderstruck'],
+  [2,'🎨','Welcher Verein brachte 1938 die Farben Lila-Weiß in die Fusion mit dem VfL ein?','SC Rapid Osnabrück','Austria Wien','Rapid Wien','Werder Bremen'],
+  [2,'⚫','Welche Farben hatte der Verein bei seiner Gründung 1899?','Schwarz und Weiß','Lila und Weiß','Blau und Weiß','Rot und Weiß'],
+  [2,'🎯','Wer war 2023/24 mit 10 Toren bester VfL-Torschütze?','Erik Engelhardt','Robin Meißner','Marc Heider','Sebastian Kerk'],
+  [2,'🎯','Wer war 2014/15 mit 14 Toren bester VfL-Torschütze?','Stanislav Ilyuchenko','Adriano Grimaldi','Kwasi Wriedt','Marcos Álvarez'],
+  [2,'🎯','Welcher Stürmer war zweimal bester VfL-Torschütze einer Saison (2015/16 und 2019/20)?','Marcos Álvarez','Halil Savran','Kwasi Wriedt','Nicky Adler'],
+  // ---- Spiel-Rätsel (Stufe 3, Erwachsene) – geprüft gegen DFB-Datencenter u. a., 23.10.2026 ----
+  [3,'🔄','August 2009, Bremer Brücke, Saison des Aufstiegs in die 2. Liga: Zur Pause liegt der VfL gegen Ingolstadt 1:2 hinten und gewinnt noch 5:2. Ein Mittelfeldspieler trifft dreimal. Wer?','Björn Lindemann','Dennis Schmidt','Matthias Heidrich','Angelo Barletta'],
+  [3,'🙃','September 2009: Gegen den Klub von der Brenz liegt der VfL zur Pause 0:2 hinten und gewinnt noch 3:2. Das Siegtor kurz vor Schluss ist besonders. Wie fiel es?','Eigentor eines Heidenheimers','Direkter Freistoß','Elfmeter','Fallrückzieher'],
+  [3,'🌲','Freitagabend, Februar 2011, Alte Försterei: Der VfL führt kurz nach der Pause 2:0, liegt nach 72 Minuten 2:3 hinten – und rettet noch ein 3:3. Wer erzielte den Ausgleich?','Nicky Adler','Tobias Nickenig','Sebastian Tyrala','Thomas Reichenberger'],
+  [3,'🇸🇮','Freitagabend in Saarbrücken: Zur Pause 0:2, am Ende 2:2. Den Ausgleich erzielt ein junger Slowene, der später für Dortmund, Leverkusen und Leipzig spielte. In welcher Saison?','2011/12','2010/11','2012/13','2013/14'],
+  [3,'🐂','Freitagabend an der Bremer Brücke: Für einen ehrgeizigen Neuling aus Sachsen trifft ein späterer dänischer Nationalstürmer, zur Pause steht es 1:2. Der VfL gewinnt noch 3:2. Der Gegner blieb nur ein Jahr in der 3. Liga. Welche Saison?','2013/14','2012/13','2014/15','2015/16'],
+  [3,'🧤','Herbst 2014 in Unterhaching: Der VfL führt 3:1, dann trifft der Sohn eines früheren Nationaltorwarts dreimal – 3:3. Kurz vor Schluss gewinnt der VfL doch noch 4:3. Wer schoss das Siegtor?','Addy-Waku Menga','Stanislav Iljutcenko','Halil Savran','Michael Hohnstedt'],
+  [3,'😱','Mittwochabend-Derby, Februar 2015: Nach 16 Minuten liegt der VfL gegen Bielefeld 0:3 hinten, am Ende heißt es 0:4. Wer traf zweimal für die Arminia?','Fabian Klos','Christian Müller','Andreas Voglsammer'],
+  [3,'⏱️','Dienstagabend in der Lausitz, August 2015: Der VfL dreht ein 0:1 und trifft in der Nachspielzeit zum 2:1-Sieg. Wer?','Halil Savran','Michael Hohnstedt','Marcos Álvarez','Addy-Waku Menga'],
+  [3,'🤯','Mittwochabend-Derby gegen Münster, September 2015: In der 90. Minute geht Preußen in Führung – ein Osnabrücker lenkt den Ball ins eigene Tor. Wie endet das Spiel?','2:2','1:2','2:1','3:2'],
+  [3,'🏰','März 2017 in Regensburg: Zur Pause 0:1, dann gleicht Ahmet Arslan aus, und in der 89. Minute trifft der Stürmer, der in dieser Saison die meisten VfL-Tore schoss. Wer?','Kwasi Wriedt','Halil Savran','Marc Heider','Marcos Álvarez'],
+  [3,'🔁','Sonntag, Februar 2018, Derby im Tecklenburger Land: 2:2 nach 51 Minuten, dann trifft in der Nachspielzeit ein Mittelfeldspieler, der später zweimal als Interimstrainer des VfL einspringt. Wer?','Tim Danneberg','Marcos Álvarez','Marc Heider','Konstantin Engel'],
+  [3,'🎢','Mittwochabend, Nachholspiel in Erfurt, März 2018: Bis zur 67. Minute fallen acht Tore, danach keines mehr. Wie endet das Spiel?','4:4','5:3 für Osnabrück','5:3 für Erfurt','6:2 für Erfurt'],
+  [3,'💰','Montagabend, November 2018, Aufstiegssaison: Gegen einen Klub mit russischem Investor liegt der VfL 0:1 hinten, gleicht aus und gewinnt in der Nachspielzeit per Handelfmeter. Wer verwandelte?','Marcos Álvarez','Tim Danneberg','Marc Heider','Benjamin Girth'],
+  [3,'🦠','Freitagabend, März 2020: Zur Pause steht es an der Bremer Brücke 2:5, ein Gegner trifft dreimal. Das 2:6 erzielt ein Mann, der heute für den VfL spielt. Kurz darauf wird der Spielbetrieb wegen Corona unterbrochen. Gegen wen?','SV Wehen Wiesbaden','Hannover 96','Arminia Bielefeld','Holstein Kiel'],
+  [3,'🎩','November 2020 in Regensburg: Der VfL gewinnt 4:2, ein Spieler trifft dreimal – zweimal per Elfmeter. Er wurde in dieser Saison bester VfL-Torschütze. Wer?','Sebastian Kerk','Etienne Amenyido','Marc Heider','Ulrich Taffertshofer'],
+  [3,'💥','Ein Sonntag im September beim Nachbarn aus der Landeshauptstadt: Der VfL verliert 0:7. In welcher Saison?','2023/24','2019/20','2020/21','2024/25'],
+  [3,'🎆','Freitagabend im Dezember 2025, Meistersaison: Der VfL gewinnt auswärts in einem Torfestival 5:3. Wo?','Ulm','Aachen','Saarbrücken','Verl']
+ ],
+ brett: [
+  [1,'🎲','Wie viele Seiten hat ein normaler Würfel?','6','4','8','5'],
+  [1,'🎲','Welche Zahl brauchst du bei „Mensch ärgere Dich nicht“, um rauszukommen?','6','1','3','4'],
+  [1,'♟️','Wie viele Figuren hat jeder bei „Mensch ärgere Dich nicht“?','4','3','5','6'],
+  [1,'🃏','Was rufst du bei UNO, wenn du nur noch eine Karte hast?','UNO!','Stopp!','Gewonnen!','Bingo!'],
+  [1,'🧠','Was suchst du beim Memory?','Zwei gleiche Bilder','Den König','Eine Sechs','Den Ausgang'],
+  [2,'♟️','Wie viele Felder hat ein Schachbrett?','64','36','81','100'],
+  [2,'♞','Welche Schachfigur darf über andere Figuren springen?','Springer','Läufer','Turm','Dame'],
+  [2,'🎲','Was ergeben gegenüberliegende Seiten eines Würfels zusammen?','7','6','8','12'],
+  [2,'🏰','Welche Straße ist beim klassischen deutschen Monopoly die teuerste?','Schlossallee','Parkstraße','Badstraße','Opernplatz'],
+  [2,'🐑','Welchen Rohstoff gibt es im Grundspiel von „Catan“ NICHT?','Gold','Lehm','Wolle','Erz'],
+  [2,'🏝️','Wer hat „Die Siedler von Catan“ erfunden?','Klaus Teuber','Reiner Knizia','Uwe Rosenberg','Wolfgang Kramer'],
+  [2,'⚪','Wie viele Steine hat jeder Spieler bei Mühle?','9','7','12','10'],
+  [2,'🏆','Welches Spiel wurde 1995 „Spiel des Jahres“?','Die Siedler von Catan','Carcassonne','Zug um Zug','Dominion']
+ ]
+};
+const MEM_POOL = ['🐶','🐱','🐭','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐢','🐙','🦋','🐞','🍎','🍌','🍓','🍉','🚗','🚂','✈️','⚽','🎈','🌈','⭐','🌙'];
+const COUNT_EMO = [['🍎','Äpfel'],['⭐','Sterne'],['🐟','Fische'],['🎈','Luftballons'],['🐞','Marienkäfer']];
+
+const CATS = {
+  flaggen:{name:'Flaggen raten', e:'🚩'},
+  staedte:{name:'Hauptstädte & Städte', e:'🏙️'},
+  klasse1:{name:'Schlau wie die 1. Klasse', e:'✏️'},
+  vfl:{name:'VfL Osnabrück', e:'💜'},
+  brett:{name:'Brettspielwissen', e:'🎲'},
+  memory:{name:'Memory-Challenge', e:'🧠'}
+};
+const SOON = [['Länderumrisse','🗺️'],['Fußballwappen','🛡️']];
+// Zeitlimit in Sekunden – das Handicap
+const TIME = { kind:{std:20, flaggen:12, vfl:20, klasse1:20, memory:15, physik:25}, erw:{std:12, flaggen:12, vfl:20, klasse1:7, memory:8, physik:15} };
+const LUKAS_P = { aus:0, selten:.18, normal:.32, oft:.55 };
+const AVATARS = ['🦖','🦁','🦉','🐻','🦊','🐸','🐼','🐯','🐙','🦄','🐢','🚀'];
+const SHAPES = ['▲','◆','●','■'];
+
+/* =================== Einstellungen =================== */
+const DEFAULTS = {
+  players:[
+    {id:'p1', name:'Kind', emoji:'🦖', level:'kind', read:true},
+    {id:'p2', name:'Papa', emoji:'🦁', level:'erw', read:false},
+    {id:'p3', name:'Opa',  emoji:'🦉', level:'erw', read:false}
+  ],
+  cats:{flaggen:true, staedte:true, klasse1:true, vfl:true, brett:true, memory:true},
+  rounds:5, lukas:'normal', sound:true
+};
+let S = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), store.get('3gq-settings') || window.claude?.hot?.data?.settings || {});
+if (!(S.lukas in LUKAS_P) || S.lukas === 'aus') S.lukas = 'normal';
+const EMBED_FOTO = 'data:image/jpeg;base64,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'; // fest eingebautes Foto (data:-URL), gilt auf allen Geräten
+let FOTO = store.get('3gq-foto') || EMBED_FOTO;
+const save = () => store.set('3gq-settings', S);
+window.claude?.hot?.snapshot?.(() => ({settings:S}));
+
+/* Flaggen-Emoji-Unterstützung prüfen (Windows-PCs zeigen nur Buchstaben) */
+const FLAGS_OK = (() => {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 24;
+    const x = c.getContext('2d'); x.font = '20px sans-serif'; x.textBaseline = 'top'; x.fillText(flag('DE'), 0, 0);
+    const d = x.getImageData(0, 0, 24, 24).data;
+    for (let i = 0; i < d.length; i += 4) if (d[i+3] > 100 && d[i] > 150 && d[i+1] < 90 && d[i+2] < 90) return true;
+    return false;
+  } catch { return true; }
+})();
+
+/* =================== Ton & Sprache =================== */
+let AC = null;
+function ensureAudio(){ if (!S.sound) return; try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch {} }
+function tone(f, d = .15, type = 'sine', at = 0, vol = .14){
+  if (!S.sound || !AC) return;
+  try {
+    const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime + at;
+    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + d + .02);
+  } catch {}
+}
+const sfx = {
+  ok(){ tone(660,.12,'triangle'); tone(880,.12,'triangle',.1); tone(1320,.25,'triangle',.2); },
+  no(){ tone(220,.3,'sawtooth',0,.08); tone(165,.4,'sawtooth',.18,.08); },
+  tick(){ tone(1000,.05,'square',0,.05); },
+  siren(){ for (let i = 0; i < 4; i++){ tone(700,.18,'square',i*.36,.07); tone(950,.18,'square',i*.36+.18,.07); } },
+  fanfare(){ [523,659,784,1047].forEach((f,i) => tone(f,.3,'triangle',i*.14)); }
+};
+function speak(text){
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'de-DE'; u.rate = .92;
+    const v = speechSynthesis.getVoices().find(v => /^de/i.test(v.lang)); if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch {}
+}
+const hush = () => { try { speechSynthesis.cancel(); } catch {} };
+
+let wake = null;
+async function keepAwake(){ try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => wake = null); } } catch {} }
+document.addEventListener('visibilitychange', () => { if (G && document.visibilityState === 'visible') keepAwake(); });
+
+/* =================== Fragen erzeugen =================== */
+function mk(prompt, big, correct, wrong, extra = {}){
+  const opts = shuffle([correct, ...wrong]);
+  return Object.assign({prompt, big, opts, correct: opts.indexOf(correct)}, extra);
+}
+function numWrong(n){ const s = new Set(); for (const d of shuffle([-2,-1,1,2,3])) { if (n+d >= 0 && s.size < 3) s.add(String(n+d)); } return [...s]; }
+
+// Flaggen: kein Handicap – alle bekommen denselben Pool und dieselben Fallen
+function genFlag(){
+  const c = pickFresh(COUNTRIES, x => 'f'+x[0]); if (!c) return null;
+  const grp = LOOKALIKE.find(g => g.includes(c[0]));
+  const near = grp ? shuffle(grp.filter(x => x !== c[0])).map(x => CNAME[x]) : [];
+  const rest = sample(COUNTRIES.filter(x => x[0] !== c[0] && !near.includes(x[1])), 3).map(x => x[1]);
+  const wrong = [...near, ...rest].slice(0, 3);
+  return mk('Welches Land hat diese Flagge?', {em:flag(c[0]), cls:'flag'}, c[1], wrong);
+}
+function genCity(lv){
+  if (lv === 2 && Math.random() < .35) {
+    const s = pickFresh(STATES, x => 's'+x[0]);
+    if (s) {
+      const wrong = shuffle([...(s[2] ? [s[2]] : []), ...sample(STATES.filter(x => x !== s), 3).map(x => x[1])]).slice(0, 3);
+      return mk(`Was ist die Landeshauptstadt von ${s[0]}?`, FLAGS_OK ? {em:flag('DE')} : {tx:'Deutschland'}, s[1], wrong);
+    }
+  }
+  const pool = CAPITALS.filter(c => c[3] === lv);
+  const c = pickFresh(pool, x => 'c'+x[0]); if (!c) return null;
+  const others = (lv === 1 ? pool : CAPITALS).filter(x => x !== c).map(x => x[2]);
+  const wrong = shuffle([...(c[4] ? [c[4]] : []), ...sample(others, 3)]).slice(0, 3);
+  return mk(`Wie heißt die Hauptstadt von ${c[1]}?`, FLAGS_OK ? {em:flag(c[0]), cls:'flag'} : {tx:c[1]}, c[2], wrong);
+}
+function genK1(){
+  const r = Math.random();
+  if (r < .2) { const a = 2+rnd(9), b = 1+rnd(Math.min(9, 20-a)); return mk('Wie viel ist das?', {tx:`${a} + ${b} = ?`}, String(a+b), numWrong(a+b), {key:'a'+a+'+'+b}); }
+  if (r < .32) { const a = 6+rnd(14), b = 1+rnd(a-1); return mk('Wie viel ist das?', {tx:`${a} − ${b} = ?`}, String(a-b), numWrong(a-b), {key:'a'+a+'-'+b}); }
+  if (r < .44) { const [e, nm] = pick(COUNT_EMO), n = 3+rnd(7); return mk(`Wie viele ${nm} siehst du?`, {em:e.repeat(n), cls:'many'}, String(n), numWrong(n), {key:'n'+e+n}); }
+  if (r < .52) { const s = 1+rnd(5), d = 1+rnd(3); const a = [s, s+d, '?', s+3*d]; return mk('Welche Zahl fehlt?', {tx:a.join(' · ')}, String(s+2*d), numWrong(s+2*d), {key:'z'+s+d}); }
+  return genStatic('klasse1', 1);
+}
+function genStatic(cat, lv){
+  const all = Q[cat];
+  // VfL: Erwachsene bekommen meist Spiel-Rätsel (Stufe 3)
+  if (cat === 'vfl' && lv === 2 && Math.random() < .65) {
+    const r = pickFresh(all.filter(q => q[0] === 3), x => cat+x[2]);
+    if (r) return mk(r[2], {em:r[1]}, r[3], r.slice(4));
+  }
+  let pool = all.filter(q => q[0] === lv);
+  let q = pickFresh(pool, x => cat+x[2]);
+  if (!q) q = pickFresh(all, x => cat+x[2]);
+  if (!q) { G.used.forEach(k => { if (k.startsWith(cat)) G.used.delete(k); }); q = pickFresh(pool.length ? pool : all, x => cat+x[2]); }
+  return mk(q[2], {em:q[1]}, q[3], q.slice(4));
+}
+function genMemory(lv){
+  const shown = sample(MEM_POOL, lv === 1 ? 4 : 6);
+  const missing = pick(MEM_POOL.filter(e => !shown.includes(e)));
+  return mk('Welches Bild war NICHT dabei?', null, missing, sample(shown, 3), {memorize:shown, memTime: lv === 1 ? 7 : 4, emojiOpts:true});
+}
+function pickFresh(pool, keyFn){
+  const free = pool.filter(x => !G.used.has(keyFn(x)));
+  if (!free.length) return null;
+  const x = pick(free); G.used.add(keyFn(x)); return x;
+}
+function generate(cat, level){
+  const lv = level === 'kind' ? 1 : 2;
+  let q = null;
+  if (cat === 'flaggen') q = genFlag();
+  else if (cat === 'staedte') q = genCity(lv) || genCity(lv === 1 ? 2 : 1);
+  else if (cat === 'klasse1') q = genK1();
+  else if (cat === 'memory') q = genMemory(lv);
+  else q = genStatic(cat, lv);
+  if (!q) { G.used.clear(); return generate(cat, level); }
+  return q;
+}
+
+/* =================== Spielzustand =================== */
+let G = null, TIMER = null, quitArmed = null, ADMIN = false, logoTaps = 0, logoT = null;
+const app = $('#app');
+
+function startGame(quick){
+  hush(); ensureAudio(); keepAwake();
+  const cats = Object.keys(CATS).filter(k => S.cats[k] && (k !== 'flaggen' || FLAGS_OK));
+  if (!cats.length) return;
+  const rounds = quick ? 2 : S.rounds;
+  G = { quick, round:0, rounds, order:shuffle(cats), pIdx:0, used:new Set(),
+        scores:Object.fromEntries(S.players.map(p => [p.id, 0])), prev:{}, lukasCount:0, lukasRound:false, q:null };
+  roundIntro();
+}
+function curCat(){ return G.order[G.round % G.order.length]; }
+function decideLukas(){
+  if (S.lukas === 'aus' && !G.quick) return false;
+  if (G.quick) return G.round === 1;
+  if (G.round === 0 || G.lukasCount >= 2) return false;
+  if (G.lukasCount === 0 && G.round === G.rounds - 1) return true; // mindestens einmal pro Spiel
+  return Math.random() < LUKAS_P[S.lukas];
+}
+
+/* =================== Ansichten =================== */
+function header(p){
+  const sc = p ? `<span class="pts">${G.scores[p.id]} P</span>` : '';
+  const who = p ? `<div class="who"><span class="e">${p.emoji}</span><b>${esc(p.name)}</b></div>` : `<div class="who"><b>Runde ${G.round+1} von ${G.rounds}</b></div>`;
+  return `<div class="ghead">${who}${sc}<button class="quit" data-act="quit">Beenden</button></div>`;
+}
+function faceHTML(cls = ''){
+  return FOTO ? `<img class="face ${cls}" src="${FOTO}" alt="Lukas">` : `<div class="face ${cls}" aria-label="Lukas">L</div>`;
+}
+
+function renderSetup(){
+  G = null; clearTimer(); hush();
+  const enabledCount = Object.keys(CATS).filter(k => S.cats[k] && (k !== 'flaggen' || FLAGS_OK)).length;
+  app.innerHTML = `
+  <section class="screen">
+    <div class="brand"><h1 data-act="logo">3Gen<span>Quiz</span></h1><div class="gens">Kind · Papa · Opa<br>ein Handy, reihum</div></div>
+
+    <div class="block">
+      <div class="label">Wer spielt mit?</div>
+      ${S.players.map((p,i) => `
+        <div class="prow">
+          <button class="av" data-act="avatar" data-i="${i}" aria-label="Figur wechseln">${p.emoji}</button>
+          <input type="text" id="name-${p.id}" data-i="${i}" value="${esc(p.name)}" maxlength="14" aria-label="Name">
+          <div class="opts">
+            <div class="seg" role="group" aria-label="Stufe">
+              <button data-act="level" data-i="${i}" data-v="kind" aria-pressed="${p.level==='kind'}">Kind</button>
+              <button data-act="level" data-i="${i}" data-v="erw" aria-pressed="${p.level==='erw'}">Erwachsen</button>
+            </div>
+            <button class="iconbtn" data-act="read" data-i="${i}" aria-pressed="${p.read}" title="Fragen automatisch vorlesen" aria-label="Vorlesen">🔊</button>
+          </div>
+          ${S.players.length > 1 ? `<button class="iconbtn" data-act="del" data-i="${i}" aria-label="Spieler entfernen">✕</button>` : '<span></span>'}
+        </div>`).join('')}
+      ${S.players.length < 6 ? `<button class="btn ghost" data-act="add" style="font-size:1rem;padding:10px">+ Spieler</button>` : ''}
+      <div class="small">„Kind“ bekommt leichtere Fragen und mehr Zeit (20 statt 12 Sekunden). Bei Flaggen spielen alle gleich. 🔊 liest jede Frage laut vor.</div>
+    </div>
+
+    <div class="block">
+      <div class="label">Kategorien</div>
+      <div class="chips">
+        ${Object.entries(CATS).map(([k,c]) => {
+          const off = k === 'flaggen' && !FLAGS_OK;
+          return `<button class="chip" data-act="cat" data-k="${k}" aria-pressed="${!!S.cats[k] && !off}" ${off?'disabled':''}><span class="e">${c.e}</span>${c.name}</button>`;
+        }).join('')}
+        ${SOON.map(([n,e]) => `<button class="chip" disabled><span class="e">${e}</span>${n} · bald</button>`).join('')}
+      </div>
+      ${!FLAGS_OK ? `<div class="notice">Dieses Gerät zeigt keine Flaggen-Emojis (typisch für Windows-PCs). Auf Handy und Tablet funktioniert die Kategorie.</div>` : ''}
+    </div>
+
+    <div class="block">
+      <div class="label">Runden</div>
+      <div class="seg" role="group" aria-label="Runden">
+        ${[3,5,8].map(n => `<button data-act="rounds" data-v="${n}" aria-pressed="${S.rounds===n}">${n} Runden</button>`).join('')}
+      </div>
+    </div>
+
+    ${ADMIN ? `
+    <div class="block">
+      <div class="label">Spielleitung (geheim)</div>
+      <div class="lukasbox">
+        ${faceHTML()}
+        <div class="txt">
+          <div class="seg" role="group" aria-label="Häufigkeit der Überraschung">
+            ${['selten','normal','oft'].map(v => `<button data-act="lukas" data-v="${v}" aria-pressed="${S.lukas===v}">${v}</button>`).join('')}
+          </div>
+          <div class="filebtn">
+            <label for="foto">${FOTO ? 'Foto ändern' : 'Foto wählen'}<input type="file" id="foto" accept="image/*"></label>
+            ${store.get('3gq-foto') ? `<button class="chip" data-act="nofoto" style="padding:7px 11px">Eigenes Foto entfernen</button>` : ''}
+            <button class="chip" data-act="admin" style="padding:7px 11px">Schließen</button>
+          </div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div class="block">
+      <button class="chip" data-act="sound" aria-pressed="${S.sound}" style="align-self:flex-start">${S.sound ? '🔔 Ton an' : '🔕 Ton aus'}</button>
+    </div>
+
+    <div class="startbar">
+      <button class="btn lila wide" data-act="start" ${enabledCount ? '' : 'disabled'}>Spiel starten</button>
+      <button class="btn ghost wide" data-act="quick">Schnelltest: 2 kurze Runden</button>
+    </div>
+  </section>`;
+}
+
+function roundIntro(){
+  clearTimer();
+  G.lukasRound = decideLukas();
+  if (G.lukasRound) G.lukasCount++;
+  G.pIdx = 0;
+  const c = CATS[curCat()];
+  app.innerHTML = `
+  <section class="screen">
+    ${header(null)}
+    <div class="center">
+      <div class="label">Nächste Kategorie</div>
+      <div class="bigicon pop">${c.e}</div>
+      <h2 class="catname pop">${c.name}</h2>
+      <p class="small">Jede Person bekommt eine eigene Frage.</p>
+    </div>
+    <button class="btn lila wide" data-act="introNext">Los geht’s</button>
+  </section>`;
+  sfx.fanfare();
+}
+
+function lukasOverlay(){
+  const el = document.createElement('div');
+  el.className = 'lukas';
+  el.innerHTML = `
+    <div class="stop">MOMENT MAL!</div>
+    ${faceHTML()}
+    <h2 class="disp">Lukas’ unerwartete Physikfrage</h2>
+    <p>Statt ${CATS[curCat()].name}: Physik! Doppelte Punkte für alle.</p>
+    <button class="btn" data-act="lukasGo">Her damit!</button>`;
+  document.body.appendChild(el);
+  sfx.siren();
+  el.querySelector('[data-act=lukasGo]').addEventListener('click', () => { el.remove(); handover(); });
+}
+
+function handover(){
+  clearTimer(); hush();
+  const p = S.players[G.pIdx];
+  if (S.players.length === 1) { ask(); return; }
+  app.innerHTML = `
+  <section class="screen handover">
+    ${header(null)}
+    <div class="center">
+      <div class="label">${G.lukasRound ? 'Physikfrage für' : 'Gib das Gerät an'}</div>
+      <div class="bigicon">${p.emoji}</div>
+      <h2>${esc(p.name)}</h2>
+      <p class="small">Die anderen schauen weg.</p>
+    </div>
+    <button class="btn lila wide" data-act="ready">Ich bin ${esc(p.name)} – bereit!</button>
+  </section>`;
+}
+
+function ask(){
+  const p = S.players[G.pIdx];
+  const cat = G.lukasRound ? 'physik' : curCat();
+  G.q = generate(cat, p.level);
+  G.q.cat = cat;
+  if (G.q.memorize) memorize(p); else question(p);
+}
+
+function memorize(p){
+  let left = G.q.memTime;
+  app.innerHTML = `
+  <section class="screen">
+    ${header(p)}
+    <div class="qcat"><div class="label"><span>${CATS.memory.e}</span> Merk dir diese Bilder!</div></div>
+    <div class="memgrid">${G.q.memorize.map(e => `<div>${e}</div>`).join('')}</div>
+    <div class="center"><div class="count" id="mc">${left}</div></div>
+  </section>`;
+  if (p.read) speak('Merk dir diese Bilder!');
+  clearTimer();
+  TIMER = setInterval(() => {
+    left--; const el = $('#mc'); if (el) el.textContent = left;
+    if (left <= 0) { clearTimer(); question(p); }
+  }, 1000);
+}
+
+function question(p){
+  const q = G.q, cat = q.cat;
+  const limit = TIME[p.level][cat in TIME[p.level] ? cat : 'std'] + (q.prompt.length > 140 ? 12 : 0);
+  const label = cat === 'physik'
+    ? `${faceHTML('lukasmini')}<span>Lukas’ Physikfrage · ×2</span>`
+    : `<span>${CATS[cat].e}</span><span>${CATS[cat].name}</span>`;
+  const big = q.big ? `<div class="bigshow">${q.big.tx ? `<div class="tx">${esc(q.big.tx)}</div>` : `<div class="em ${q.big.cls||''}">${q.big.em}</div>`}</div>` : '';
+  app.innerHTML = `
+  <section class="screen">
+    ${header(p)}
+    <div class="qcat"><div class="label">${label}</div><button class="speak" data-act="speak" aria-label="Frage vorlesen">🔊</button></div>
+    <div class="qtext${q.prompt.length > 80 ? ' long' : ''}">${esc(q.prompt)}</div>
+    ${big}
+    <div class="timer" id="tm"><i></i></div>
+    <div class="tiles">
+      ${q.opts.map((o,i) => `<button class="tile c${i} ${q.emojiOpts?'e':''}" data-act="answer" data-i="${i}">${q.emojiOpts?'':`<span class="sh">${SHAPES[i]}</span>`}${esc(o)}</button>`).join('')}
+    </div>
+  </section>`;
+  if (p.read) speakQ();
+  const bar = $('#tm i'), tm = $('#tm');
+  const t0 = performance.now(); let lastTick = -1;
+  q.limit = limit; q.t0 = t0;
+  clearTimer();
+  const step = now => {
+    const el = (now - t0) / 1000, left = Math.max(0, limit - el);
+    bar.style.transform = `scaleX(${left / limit})`;
+    if (left <= 3) { tm.classList.add('low'); const s = Math.ceil(left); if (s !== lastTick && s > 0) { lastTick = s; sfx.tick(); } }
+    if (left <= 0) { answer(-1); return; }
+    TIMER = requestAnimationFrame(step);
+  };
+  TIMER = requestAnimationFrame(step);
+}
+function speakQ(){
+  const q = G.q;
+  const opts = q.emojiOpts ? '' : ' ' + q.opts.join('. Oder: ') + '.';
+  const said = q.big && q.big.tx ? ' ' + q.big.tx.replace(/\+/g,' plus ').replace(/−/g,' minus ').replace(/=\s*\?/,'').replace(/·/g,', ').replace(/\?/g,'was fehlt') + '.' : '';
+  speak(q.prompt + said + opts);
+}
+
+function answer(i){
+  clearTimer(); hush();
+  const p = S.players[G.pIdx], q = G.q;
+  const el = (performance.now() - q.t0) / 1000;
+  const ok = i === q.correct;
+  let gain = 0;
+  if (ok) { gain = Math.round(500 + 500 * Math.max(0, (q.limit - el) / q.limit)); if (q.cat === 'physik') gain *= 2; }
+  G.scores[p.id] += gain;
+  ok ? sfx.ok() : sfx.no();
+  const last = G.pIdx === S.players.length - 1;
+  const next = last ? 'Zwischenstand' : `Weiter zu ${esc(S.players[G.pIdx+1].name)}`;
+  const sol = q.emojiOpts ? `<span class="em">${q.opts[q.correct]}</span>` : `<b>${esc(q.opts[q.correct])}</b>`;
+  app.innerHTML = `
+  <section class="screen">
+    ${header(p)}
+    <div class="center">
+      <h2 class="verdict ${ok?'ok':'no'} pop">${ok ? 'Richtig!' : i < 0 ? 'Zeit ist um!' : 'Leider falsch'}</h2>
+      <div class="gain">+${gain}</div>
+      ${ok ? '' : `<div class="solution">Richtig wäre: ${sol}</div>`}
+      ${ok && q.cat === 'physik' ? '<p class="small">Doppelte Punkte dank Lukas!</p>' : ''}
+    </div>
+    <button class="btn lila wide" data-act="next">${next}</button>
+  </section>`;
+  if (p.read) speak(ok ? 'Richtig!' : 'Leider falsch. Richtig wäre: ' + (q.emojiOpts ? '' : q.opts[q.correct]));
+}
+
+function scoreboard(final){
+  clearTimer(); hush();
+  const ranked = S.players.slice().sort((a,b) => G.scores[b.id] - G.scores[a.id]);
+  const max = Math.max(1, ...ranked.map(p => G.scores[p.id]));
+  if (final) return podium(ranked);
+  app.innerHTML = `
+  <section class="screen">
+    ${header(null)}
+    <h2 class="catname" style="font-size:1.9rem">Zwischenstand</h2>
+    <div class="board">
+      ${ranked.map((p,i) => `
+        <div class="brow">
+          <div class="rk">${i+1}</div><div class="e">${p.emoji}</div>
+          <div class="bar"><i data-w="${G.scores[p.id]/max*100}" style="width:${(G.prev[p.id]||0)/max*100}%"></i>
+            <span><b>${esc(p.name)}</b><em>${G.scores[p.id]}</em></span></div>
+        </div>`).join('')}
+    </div>
+    <div class="spacer"></div>
+    <button class="btn lila wide" data-act="nextRound">${G.round + 1 >= G.rounds ? 'Zur Siegerehrung' : 'Nächste Runde'}</button>
+  </section>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.bar i').forEach(b => b.style.width = b.dataset.w + '%')));
+  G.prev = {...G.scores};
+}
+
+function podium(ranked){
+  const order = [ranked[1], ranked[0], ranked[2]];
+  app.innerHTML = `
+  <section class="screen">
+    <div class="center">
+      <div class="label">Siegerehrung</div>
+      <h2 class="catname">${esc(ranked[0].name)} gewinnt!</h2>
+      <div class="podium">
+        ${order.map((p,j) => p ? `
+          <div class="pod p${[2,1,3][j]}">
+            <div class="e">${p.emoji}</div><div class="nm">${esc(p.name)}</div><div class="sc">${G.scores[p.id]} Punkte</div>
+            <div class="blk">${[2,1,3][j]}</div>
+          </div>` : '').join('')}
+      </div>
+      ${ranked.length > 3 ? `<p class="small">${ranked.slice(3).map((p,i) => `${i+4}. ${esc(p.name)} · ${G.scores[p.id]}`).join(' &nbsp; ')}</p>` : ''}
+    </div>
+    <button class="btn lila wide" data-act="again">Nochmal spielen</button>
+    <button class="btn ghost wide" data-act="home">Zur Startseite</button>
+  </section>`;
+  sfx.fanfare(); confetti();
+}
+
+function confetti(){
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = $('#confetti'), x = cv.getContext('2d');
+  cv.hidden = false; cv.width = innerWidth; cv.height = innerHeight;
+  const cols = ['#ff6b57','#2cc4b2','#ffc233','#5f8fff','#a56ff2','#fff8ef'];
+  const ps = Array.from({length:140}, () => ({x:Math.random()*cv.width, y:-20-Math.random()*cv.height*.5, vx:(Math.random()-.5)*2, vy:2+Math.random()*3, r:Math.random()*6, c:pick(cols), a:Math.random()*6}));
+  const t0 = performance.now();
+  (function f(now){
+    x.clearRect(0,0,cv.width,cv.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.a += .1; x.fillStyle = p.c; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillRect(-4,-2,8+p.r,4); x.restore(); });
+    if (now - t0 < 4000) requestAnimationFrame(f); else { x.clearRect(0,0,cv.width,cv.height); cv.hidden = true; }
+  })(t0);
+}
+
+function clearTimer(){ if (TIMER) { cancelAnimationFrame(TIMER); clearInterval(TIMER); TIMER = null; } }
+
+/* =================== Ereignisse =================== */
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, i = +b.dataset.i;
+  ensureAudio();
+  switch (act) {
+    case 'avatar': { const p = S.players[i]; p.emoji = AVATARS[(AVATARS.indexOf(p.emoji)+1) % AVATARS.length]; save(); renderSetup(); break; }
+    case 'level': S.players[i].level = b.dataset.v; if (b.dataset.v === 'kind') S.players[i].read = true; save(); renderSetup(); break;
+    case 'read': S.players[i].read = !S.players[i].read; save(); renderSetup(); break;
+    case 'del': S.players.splice(i,1); save(); renderSetup(); break;
+    case 'add': S.players.push({id:'p'+Date.now(), name:'Spieler '+(S.players.length+1), emoji:pick(AVATARS), level:'erw', read:false}); save(); renderSetup(); break;
+    case 'cat': S.cats[b.dataset.k] = !S.cats[b.dataset.k]; save(); renderSetup(); break;
+    case 'rounds': S.rounds = +b.dataset.v; save(); renderSetup(); break;
+    case 'lukas': S.lukas = b.dataset.v; save(); renderSetup(); break;
+    case 'logo': clearTimeout(logoT); logoTaps++; logoT = setTimeout(() => logoTaps = 0, 1500); if (logoTaps >= 5) { logoTaps = 0; ADMIN = true; renderSetup(); } break;
+    case 'admin': ADMIN = false; renderSetup(); break;
+    case 'sound': S.sound = !S.sound; save(); renderSetup(); break;
+    case 'nofoto': FOTO = EMBED_FOTO; store.set('3gq-foto', null); renderSetup(); break;
+    case 'start': startGame(false); break;
+    case 'quick': startGame(true); break;
+    case 'introNext': G.lukasRound ? lukasOverlay() : handover(); break;
+    case 'ready': ask(); break;
+    case 'speak': speakQ(); break;
+    case 'answer': answer(i); break;
+    case 'next':
+      if (G.pIdx < S.players.length - 1) { G.pIdx++; handover(); }
+      else scoreboard(false);
+      break;
+    case 'nextRound':
+      G.round++;
+      if (G.round >= G.rounds) scoreboard(true); else roundIntro();
+      break;
+    case 'again': startGame(G.quick); break;
+    case 'home': renderSetup(); break;
+    case 'quit':
+      if (quitArmed) { clearTimeout(quitArmed); quitArmed = null; renderSetup(); }
+      else { b.classList.add('armed'); b.textContent = 'Wirklich beenden?'; quitArmed = setTimeout(() => { quitArmed = null; b.classList.remove('armed'); b.textContent = 'Beenden'; }, 3000); }
+      break;
+  }
+});
+app.addEventListener('input', e => {
+  if (e.target.matches('input[type=text][data-i]')) { S.players[+e.target.dataset.i].name = e.target.value.trim() || 'Spieler'; save(); }
+});
+app.addEventListener('change', e => {
+  if (e.target.id !== 'foto' || !e.target.files[0]) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = 320;
+      c.getContext('2d').drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 320, 320);
+      FOTO = c.toDataURL('image/jpeg', .85); store.set('3gq-foto', FOTO); renderSetup();
+    };
+    img.src = r.result;
+  };
+  r.readAsDataURL(e.target.files[0]);
+});
+if ('speechSynthesis' in window) { try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch {} }
+
+const start = () => renderSetup();
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start();
+})();
+</script>
+</body></html>
