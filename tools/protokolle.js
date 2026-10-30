@@ -10,7 +10,7 @@ const val = v => v.mapValue ? obj(v.mapValue.fields || {}) : v.arrayValue ? (v.a
 const obj = f => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, val(v)]));
 const docs = []; let tok = '';
 do { const r = get(BASE + '?pageSize=300' + (tok ? '&pageToken=' + tok : '')); (r.documents || []).forEach(d => docs.push(obj(d.fields || {}))); tok = r.nextPageToken; } while (tok);
-const games = docs.filter(d => d.gid).sort((a, b) => a.start < b.start ? -1 : 1);
+const games = docs.filter(d => d.gid && !d.test).sort((a, b) => a.start < b.start ? -1 : 1);
 const dir = path.join(__dirname, 'protokolle-daten'); fs.mkdirSync(dir, { recursive:true });
 fs.writeFileSync(path.join(dir, 'alle.json'), JSON.stringify(games, null, 1));
 const one = process.argv[2];
