@@ -288,6 +288,7 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .dcard{position:relative;width:150px;height:150px;border-radius:50%;background:#fff8ef;border:3px solid #ffc233}
 .dcard span{position:absolute;font-size:28px;line-height:1}
 .mirpair{display:flex;align-items:center;justify-content:center;gap:14px;font-size:1.6rem}
+.buzzer{font-size:1.5rem;padding:1.1rem;background:#ffc233;color:#1b0a30;margin-top:.6rem}
 </style>
 
 <div id="app"></div>
@@ -1381,9 +1382,9 @@ function genDobbleSpeed(level){
   for (let s = 0; s < 3; s++) {
     const pool = sample(DOBBLE_SYM, 2 * n - 1), common = pool[0], a = shuffle([common, ...pool.slice(1, n)]), b = shuffle([common, ...pool.slice(n)]);
     const opts = shuffle([common, ...sample([...a, ...b].filter(x => x !== common), 3)]);
-    steps.push({prompt: `⚡ Speed-Runde ${s + 1}/3: Welches Symbol ist auf BEIDEN Karten?`, big: {html: `<div class="dpair">${dobbleCard(a)}${dobbleCard(b)}</div>`}, opts, correct: opts.indexOf(common)});
+    steps.push({prompt: `⚡ Speed-Runde ${s + 1}/3: Welches Symbol ist auf BEIDEN Karten? Erst buzzern, dann antworten!`, big: {html: `<div class="dpair">${dobbleCard(a)}${dobbleCard(b)}</div>`}, opts, correct: opts.indexOf(common)});
   }
-  return {steps, si:0, res:[], prompt: steps[0].prompt, opts: steps[0].opts, correct: steps[0].correct, emojiOpts: true, info: 'Bei Dobble haben zwei Karten immer genau ein Symbol gemeinsam.', fixT: {kind: 30, erw: 20, gross: 26}, key:'db'};
+  return {steps, si:0, res:[], prompt: steps[0].prompt, opts: steps[0].opts, correct: steps[0].correct, emojiOpts: true, buzz: true, info: 'Bei Dobble haben zwei Karten immer genau ein Symbol gemeinsam.', fixT: {kind: 30, erw: 20, gross: 26}, key:'db'};
 }
 function genSpiegelSpeed(level){
   const kid = level === 'kind', steps = [], names = Object.keys(PIECES).filter(p => PIECES[p].length >= 4 && !['O4','I4'].includes(p));
@@ -1414,7 +1415,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-212748';
+const APP_VERSION = '20261030-213112';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1490,7 +1491,7 @@ function hostMsg(conn, m){
   if (m.t === 'log') { log('gast:' + ((P(conn.pid) || {}).name || '?'), m.d); return; }
   if (m.t === 'act') {
     const ow = screenOwner();
-    const allowed = ['ready','cell','take','answer','next','speak','play','lukasGo','mmPick','mmDel','mmOk','genrePick','betAdd','betSub','betDone'];
+    const allowed = ['ready','cell','take','answer','next','speak','play','lukasGo','mmPick','mmDel','mmOk','genrePick','betAdd','betSub','betDone','buzz'];
     const betOk = false;
     if (!betOk && (!ow || ow.id !== conn.pid || !allowed.includes(m.a))) { log('klick-abgelehnt', {von: (P(conn.pid) || {}).name, aktion: m.a, dran: ow ? ow.name : 'alle'}); return; }
     act(m.a, +m.i, m.a === 'lukasGo' ? (P(conn.pid) || {}).name : m.v, null);
@@ -1951,9 +1952,9 @@ function question(p, keep){
     ${header(p)}
     <div class="qcat"><div class="label">${label}</div><button class="speak" data-act="speak" aria-label="Frage vorlesen">🔊</button></div>
     <div class="qtext${q.prompt.length > 80 ? ' long' : ''}">${esc(q.prompt)}</div>
-    ${pre && q.steps ? '' : bigHTML(q.big)}
+    ${(pre && q.steps) || (q.buzz && q.buzzed) ? '' : bigHTML(q.big)}
     <div class="timer" id="tm"><i></i></div>
-    ${pre ? `<div class="prewait"><span></span><span></span><span></span></div>` : q.input ? mmInputHTML(q) : `<div class="tiles">
+    ${pre ? `<div class="prewait"><span></span><span></span><span></span></div>` : q.buzz && !q.buzzed ? `<button class="btn buzzer wide" data-act="buzz">🔔 Ich hab’s!</button>` : q.input ? mmInputHTML(q) : `<div class="tiles">
       ${q.opts.map((o,i) => `<button class="tile c${i % 4} ${q.emojiOpts?'e':''}${q.optHtml?' htm':''}${q.opts.length > 4 ? ' sm' : ''}${q.gone && q.gone.includes(o) ? ' gone' : ''}" data-act="answer" data-i="${i}"${q.tileStyle ? ` style="${q.tileStyle[i]}"` : ''}>${q.emojiOpts||q.tileStyle?'':`<span class="sh">${SHAPES[i % 4]}</span>`}${q.optHtml ? q.optHtml[i] : esc(o)}</button>`).join('')}
     </div>`}
   </section>`, p, pre ? {} : {timer:limit});
@@ -2001,7 +2002,7 @@ function answer(i){
   const q0 = G.q;
   if (q0 && q0.steps) {                                   // Speed-Runde mit mehreren Teilfragen
     (q0.res = q0.res || []).push(i >= 0 && i === q0.correct);
-    if (i >= 0 && (q0.si || 0) < q0.steps.length - 1) { q0.si = (q0.si || 0) + 1; question(cur(), true); return; }
+    if (i >= 0 && (q0.si || 0) < q0.steps.length - 1) { q0.si = (q0.si || 0) + 1; q0.buzzed = false; question(cur(), true); return; }
   }
   clearTimer(); hush(); stopNotes();
   const fin = G.phase === 'finale';
@@ -2211,7 +2212,8 @@ function act(act, i, v, b){
     case 'take': if (SEL != null && !G.lukasWait) take(); break;
     case 'speak': G.q.audio ? playNotes(G.q.audio) : speakQ(); break;
     case 'play': playNotes(G.q.audio); break;
-    case 'answer': if (G.q && !G.q.revealed) break; if (G.q && G.q.gone && G.q.gone.includes(G.q.opts[i])) break; answer(i); break;
+    case 'buzz': if (G.q && G.q.buzz && !G.q.buzzed) { G.q.buzzed = true; question(cur(), true); } break;
+    case 'answer': if (G.q && !G.q.revealed) break; if (G.q && G.q.buzz && !G.q.buzzed) break; if (G.q && G.q.gone && G.q.gone.includes(G.q.opts[i])) break; answer(i); break;
     case 'betAdd': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) < 2) { G.bet.mine[i]++; wetteBetScreen(); } break;
     case 'betSub': if (G.bet && G.bet.mine[i] > 0) { G.bet.mine[i]--; wetteBetScreen(); } break;
     case 'betDone': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) === 2) wetteBetDone(); break;
