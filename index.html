@@ -240,6 +240,18 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .chesslegend{margin-top:6px; text-align:center}
 .facts{list-style:none;margin:.4rem auto;padding:0;max-width:34rem;text-align:left}
 .facts li{background:rgba(255,255,255,.08);border-radius:10px;padding:.45rem .7rem;margin:.3rem 0;font-size:1rem;line-height:1.3}
+.mm{display:flex;flex-direction:column;gap:.45rem;align-items:center;margin:.3rem 0}
+.mmline{display:flex;align-items:center;gap:.8rem;background:rgba(255,255,255,.08);padding:.35rem .6rem;border-radius:12px}
+.mmrow{display:inline-flex;gap:6px;vertical-align:middle}
+.mmdot{display:inline-block;border-radius:50%;border:2px solid rgba(0,0,0,.35)}
+.mmpegs{display:inline-grid;grid-template-columns:repeat(2,10px);gap:3px}
+.mmpegs i{width:10px;height:10px;border-radius:50%;display:block}
+.mmpegs .pb{background:#111;border:1px solid #fff}.mmpegs .pw{background:#fff}.mmpegs .p0{background:transparent;border:1px dashed rgba(255,255,255,.35)}
+.tile.htm{justify-content:center}
+.stroop{font-size:3.4rem;font-weight:900;letter-spacing:.05em;text-align:center;padding:.4rem 0;background:#f4eefc;border-radius:16px;margin:.2rem auto;max-width:22rem}
+.tile.htm .sh{display:none}
+.tile.htm{padding-left:.5rem;padding-right:.5rem}
+.tile.htm{display:flex;align-items:center;justify-content:center;text-align:center}
 </style>
 
 <div id="app"></div>
@@ -432,6 +444,7 @@ function getQuestion(cellIdx, level){
   else if (row === 'vfl' && col === 'farben') q = (Math.random() < .7 ? (easy ? genVflFarbenKind() : genVflFarbenSpiel()) : null) || fromPool(row, col, poolKey) || (easy ? genVflFarbenKind() : genVflFarbenSpiel());
   else if (row === 'vfl' && col === 'form') q = (Math.random() < (easy ? .3 : .6) ? genVflSort(level) : null) || fromPool(row, col, poolKey) || genVflSort(level);
   else if (row === 'geo' && col === 'klasse1') q = (Math.random() < .6 ? genCapital(level) : null) || fromPool(row, col, poolKey) || genCapital(level);
+  else if (row === 'spiele' && col === 'farben') q = genFarbRaetsel(level) || fromPool(row, col, poolKey);
   else if (row === 'geo' && col === 'form') q = (Math.random() < .8 ? genShape(easy) : null) || fromPool(row, col, poolKey) || genShape(!easy);
   else if (row === 'musik' && col === 'form') q = (Math.random() < .65 ? genMelody(level) : null) || fromPool(row, col, poolKey) || genMelody(level);
   else if (row === 'spiele' && (col === 'klasse1' || col === 'form')) q = (Math.random() < .5 ? genBoardSituation(col, level) : null) || fromPool(row, col, poolKey) || genBoardSituation(col, level);
@@ -912,6 +925,57 @@ function genGeoPlus(){
   return null;
 }
 
+/* =================== Spiele × Farben: Farbrätsel (Mastermind, Speed-Runde Farbwort) =================== */
+const COLS6 = [['Rot','#e53935'],['Blau','#1e6fe0'],['Grün','#2e9e44'],['Gelb','#fdd835'],['Lila','#8e24aa'],['Orange','#fb8c00']];
+const dotRow = (code, size = 22) => `<span class="mmrow">${code.map(c => `<i class="mmdot" style="background:${COLS6[c][1]};width:${size}px;height:${size}px"></i>`).join('')}</span>`;
+function mmFeedback(secret, guess){
+  let black = 0; const s = [], g = [];
+  secret.forEach((c, i) => { if (guess[i] === c) black++; else { s.push(c); g.push(guess[i]); } });
+  let white = 0; for (const c of g) { const k = s.indexOf(c); if (k >= 0) { white++; s.splice(k, 1); } }
+  return [black, white];
+}
+const allCodes = (n, k) => { let out = [[]]; for (let i = 0; i < n; i++) out = out.flatMap(c => Array.from({length:k}, (_, x) => [...c, x])); return out; };
+function genMastermind(level){
+  const kid = level === 'kind', n = kid ? 3 : 4, k = kid ? 4 : 6, nGuess = kid ? 2 : 3, ALL = allCodes(n, k);
+  for (let t = 0; t < 300; t++) {
+    const secret = Array.from({length:n}, () => rnd(k));
+    const guesses = Array.from({length:nGuess}, () => Array.from({length:n}, () => rnd(k)));
+    if (guesses.some(g => g.join() === secret.join())) continue;
+    const fb = guesses.map(g => mmFeedback(secret, g));
+    const consistent = ALL.filter(c => guesses.every((g, j) => { const f = mmFeedback(c, g); return f[0] === fb[j][0] && f[1] === fb[j][1]; }));
+    if (consistent.length > (kid ? 4 : 12)) continue;             // die Hinweise müssen ordentlich eingrenzen
+    // falsche Antworten: verletzen genau einen Hinweis (knapp daneben)
+    const near = ALL.filter(c => guesses.filter((g, j) => { const f = mmFeedback(c, g); return f[0] !== fb[j][0] || f[1] !== fb[j][1]; }).length === 1);
+    if (near.length < 3) continue;
+    const wrong = sample(near, 3);
+    const pegs = f => `<span class="mmpegs">${'<i class="pb"></i>'.repeat(f[0])}${'<i class="pw"></i>'.repeat(f[1])}${'<i class="p0"></i>'.repeat(n - f[0] - f[1])}</span>`;
+    const html = `<div class="mm">${guesses.map((g, j) => `<div class="mmline">${dotRow(g)}${pegs(fb[j])}</div>`).join('')}</div>
+      <div class="small">● schwarz = richtige Farbe am richtigen Platz · ○ weiß = richtige Farbe, falscher Platz${kid ? '' : ' · Farben können mehrfach vorkommen'}</div>`;
+    const name = c => c.map(x => COLS6[x][0]).join(' ');
+    const opts = [secret, ...wrong], q = mk('Mastermind: Welcher Geheimcode passt zu allen Hinweisen?', {html}, name(secret), wrong.map(name), {key:'mm', extraT: kid ? 10 : 15});
+    q.optHtml = q.opts.map(o => dotRow(opts.find(c => name(c) === o), n === 4 ? 20 : 24));
+    return q;
+  }
+  return null;
+}
+function genStroop(level){
+  const kid = level === 'kind', pal = COLS6.slice(0, kid ? 4 : 6), steps = [];
+  for (let s = 0; s < 3; s++) {
+    const ink = rnd(pal.length); let word; do { word = rnd(pal.length); } while (word === ink);
+    const others = sample(pal.map((_, i) => i).filter(i => i !== ink && i !== word), 2);
+    const opts = shuffle([ink, word, ...others]);
+    const bgs = shuffle(opts.slice());                       // Kachelfarben passen absichtlich NICHT zum Wort darauf
+    for (let t = 0; t < 20 && bgs.some((b, i) => b === opts[i]); t++) shuffle(bgs);
+    steps.push({ prompt: `⚡ Speed-Runde ${s + 1}/3: Tippe die FARBE DER SCHRIFT!`,
+      big: {html: `<div class="stroop" style="color:${pal[ink][1]}">${pal[word][0].toUpperCase()}</div>`},
+      opts: opts.map(i => pal[i][0]), correct: opts.indexOf(ink),
+      tileStyle: bgs.map(b => `background:${pal[b][1]};color:${pal[b][0] === 'Gelb' ? '#1b0a30' : '#fff'}`) });
+  }
+  return {steps, si:0, res:[], prompt: steps[0].prompt, opts: steps[0].opts, correct: steps[0].correct, info: 'Gefragt war immer die Schriftfarbe, nicht das Wort.',
+    fixT: {kind: 18, erw: 10, gross: 14}, key:'st'};
+}
+function genFarbRaetsel(level){ return Math.random() < .55 ? genMastermind(level) : genStroop(level); }
+
 
 /* =================== Spielzustand =================== */
 let G = null, TIMER = null, quitArmed = null, ADMIN = false, logoTaps = 0, logoT = null, SEL = null;
@@ -920,7 +984,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-164520';
+const APP_VERSION = '20261030-170204';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1435,10 +1499,11 @@ function bigHTML(b){
   return `<div class="bigshow small-em"><div class="em ${b.cls||''}">${b.em}</div></div>`;
 }
 
-function question(p){
+function question(p, keep){
   const q = G.q, fin = G.phase === 'finale';
   const lv = LEVELS[p.level];
-  const limit = lv.t + (q.prompt.length > 140 ? 10 : 0) + (q.audio ? 10 + Math.ceil(q.audio.chord ? 3 : melDur(q)) : 0) + (q.big && q.big.html ? 5 : 0) + (q.extraT || 0);
+  if (q.steps) { const s = q.steps[q.si || 0]; q.prompt = s.prompt; q.opts = s.opts; q.correct = s.correct; q.big = s.big; q.tileStyle = s.tileStyle; }
+  const limit = q.fixT ? q.fixT[p.level] || q.fixT.erw : lv.t + (q.prompt.length > 140 ? 10 : 0) + (q.audio ? 10 + Math.ceil(q.audio.chord ? 3 : melDur(q)) : 0) + (q.big && q.big.html ? 5 : 0) + (q.extraT || 0);
   const label = fin ? `<span>🧠</span><span>Finale · Memory</span>`
     : q.lukas ? `${faceHTML('lukasmini')}<span>Lukas’ Physikfrage · Bonus bis 100 P.</span>`
     : `<span>${ROWS[cellRC(q.cell)[0]].e}${COLS[cellRC(q.cell)[1]].e}</span><span>${esc(cellName(q.cell))}${COLS[cellRC(q.cell)[1]].half ? ' · ½ Punkte' : ''}</span>`;
@@ -1450,16 +1515,17 @@ function question(p){
     ${bigHTML(q.big)}
     <div class="timer" id="tm"><i></i></div>
     <div class="tiles">
-      ${q.opts.map((o,i) => `<button class="tile c${i} ${q.emojiOpts?'e':''}" data-act="answer" data-i="${i}">${q.emojiOpts?'':`<span class="sh">${SHAPES[i]}</span>`}${esc(o)}</button>`).join('')}
+      ${q.opts.map((o,i) => `<button class="tile c${i} ${q.emojiOpts?'e':''}${q.optHtml?' htm':''}" data-act="answer" data-i="${i}"${q.tileStyle ? ` style="${q.tileStyle[i]}"` : ''}>${q.emojiOpts||q.tileStyle?'':`<span class="sh">${SHAPES[i]}</span>`}${q.optHtml ? q.optHtml[i] : esc(o)}</button>`).join('')}
     </div>
   </section>`, p, {timer:limit});
-  if (q.audio) ownerFx(p, 'audio', q.audio); else if (p.read) speakQ();
-  const bar = $('#tm i'), tm = $('#tm');
+  if (keep) return;                                       // Speed-Runde: nächste Teilfrage, Uhr läuft weiter
+  if (q.audio) ownerFx(p, 'audio', q.audio); else if (p.read && !q.steps) speakQ();
   const t0 = performance.now(); let lastTick = -1;
   q.limit = limit; q.t0 = t0;
   clearTimer();
   const step = now => {
-    const el = (now - t0) / 1000, left = Math.max(0, limit - el);
+    const el = (now - t0) / 1000, left = Math.max(0, limit - el), bar = $('#tm i'), tm = $('#tm');
+    if (!bar) { TIMER = requestAnimationFrame(step); return; }
     bar.style.transform = `scaleX(${left / limit})`;
     if (left <= 3) { tm.classList.add('low'); const s = Math.ceil(left); if (s !== lastTick && s > 0) { lastTick = s; ownerFx(p, 'sfx', 'tick'); } }
     if (left <= 0) { answer(-1); return; }
@@ -1491,18 +1557,25 @@ function memorize(p){
 }
 
 function answer(i){
+  const q0 = G.q;
+  if (q0 && q0.steps) {                                   // Speed-Runde mit mehreren Teilfragen
+    (q0.res = q0.res || []).push(i >= 0 && i === q0.correct);
+    if (i >= 0 && (q0.si || 0) < q0.steps.length - 1) { q0.si = (q0.si || 0) + 1; question(cur(), true); return; }
+  }
   clearTimer(); hush(); stopNotes();
   const fin = G.phase === 'finale';
   const p = fin ? S.players[G.fin] : cur(), q = G.q;
   const el = (performance.now() - q.t0) / 1000;
-  const ok = i === q.correct;
+  const nOk = q.steps ? q.res.filter(Boolean).length : 0;
+  const ok = q.steps ? nOk === q.steps.length : i === q.correct;
   let gain = 0;
-  if (ok) {
+  if (ok || nOk) {
     const speed = Math.max(0, (q.limit - el) / q.limit);
     gain = fin ? Math.round(1500 + 500 * speed) : Math.round(500 + 500 * speed);
+    if (q.steps) gain = Math.round(gain * nOk / q.steps.length);
     if (q.lukas) gain = Math.round(50 + 50 * speed);          // Lukas-Bonusfrage: bis zu 100 Punkte
     else if (!fin && COLS[cellRC(q.cell)[1]].half) gain = Math.round(gain / 2);   // 1. Klasse: halbe Punkte
-    if (!fin && !q.lukas) G.right[p.id]++;
+    if (!fin && !q.lukas && ok) G.right[p.id]++;
   }
   G.scores[p.id] += gain;
   G.done = fin ? 'F'+G.fin : q.lukas ? 'L'+G.turn : 'T'+G.turn;
@@ -1521,14 +1594,14 @@ function answer(i){
   if (q.lukas) next = `Und jetzt deine Frage: ${esc(cellName(q.cell))}`;
   else if (fin) next = G.fin < S.players.length - 1 ? `Weiter zu ${esc(S.players[G.fin+1].name)}` : 'Zur Siegerehrung';
   else next = G.turn + 1 >= G.total ? 'Zum Finale' : (S.players.length > 1 && (G.turn + 1) % S.players.length === 0 ? 'Zwischenstand' : `Weiter zu ${esc(S.players[(G.turn+1) % S.players.length].name)}`);
-  const sol = (q.emojiOpts ? `<span class="em">${q.opts[q.correct]}</span>` : `<b>${esc(q.opts[q.correct])}</b>`) + (q.info ? ` – ${esc(q.info)}` : '');
+  const sol = q.steps ? esc(q.info || '') : q.optHtml ? q.optHtml[q.correct] + (q.info ? ` – ${esc(q.info)}` : '') : (q.emojiOpts ? `<span class="em">${q.opts[q.correct]}</span>` : `<b>${esc(q.opts[q.correct])}</b>`) + (q.info ? ` – ${esc(q.info)}` : '');
   paint(`
   <section class="screen">
     ${header(p)}
     <div class="center">
-      <h2 class="verdict ${ok?'ok':'no'} pop">${ok ? 'Richtig!' : i < 0 ? 'Zeit ist um!' : 'Leider falsch'}</h2>
+      <h2 class="verdict ${ok?'ok':'no'} pop">${q.steps ? `${nOk} von ${q.steps.length} richtig${i < 0 ? ' – Zeit um' : ''}` : ok ? 'Richtig!' : i < 0 ? 'Zeit ist um!' : 'Leider falsch'}</h2>
       <div class="gain">+${gain}</div>
-      <div class="solution">${ok ? 'Lösung' : 'Richtig wäre'}: ${sol}</div>
+      <div class="solution">${q.steps ? '' : (ok ? 'Lösung' : 'Richtig wäre') + ': '}${sol}</div>
       ${q.lukas ? '<p class="small">Bonus von Lukas – jetzt bist du nochmal dran!</p>' : ''}
     </div>
     <button class="btn lila wide" data-act="next">${next}</button>
