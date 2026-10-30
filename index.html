@@ -783,7 +783,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-142823';
+const APP_VERSION = '20261030-154426';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1066,13 +1066,41 @@ function netShutdown(){
 function log(type, d){
   try {
     const L = store.get('3gq2-log') || [];
+    if (type === 'FEHLER' || (type.startsWith('gast') && d && d.typ !== 'ping')) { try { CLOUD.errs.push(type.split(':')[0] + ' ' + JSON.stringify(d).slice(0, 160)); } catch {} }
     const t = new Date(); const ts = t.toLocaleDateString('de-DE') + ' ' + t.toLocaleTimeString('de-DE');
     L.push(`${ts} [${NET.role || 'lokal'}] ${type} ${d ? JSON.stringify(d) : ''}`);
     store.set('3gq2-log', L.slice(-600));
   } catch {}
 }
 function gLog(type, d){ log(type, d); if (NET.role === 'guest' && NET.guestConn) { try { NET.guestConn.send({t:'log', d:{typ:type, ...d}}); } catch {} } }
-window.addEventListener('error', e => log('FEHLER', {msg: e.message, zeile: e.lineno}));
+/* =================== Cloud-Protokoll (Firestore, gleiche Datenbank wie BurbenogInspired) ===================
+   Pro Spiel ein Dokument games/3genquiz/archiv/<gid>: Stufen, Punkte, jede Antwort (Feld, Stufe, richtig, Zeit) und Fehler.
+   Keine Namen. Nur von der GitHub-Seite aus (der Schlüssel ist auf vflukas04.github.io beschränkt). */
+const CLOUD = { url: 'https://firestore.googleapis.com/v1/projects/burbenoginspired/databases/(default)/documents/games/3genquiz/archiv/',
+  key: 'AIzaSyDqKXqGho_rQveqs7ltUR_vHykgGClgL1I', timer: null, errs: [] };
+const cloudOn = () => /github\.io$/.test(location.hostname) && !NET_TEST && NET.role !== 'guest' && S.cloud !== false;
+const toFS = v => v === null || v === undefined ? {nullValue:null} : Array.isArray(v) ? {arrayValue:{values:v.map(toFS)}}
+  : typeof v === 'object' ? {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toFS(x)]))}}
+  : typeof v === 'boolean' ? {booleanValue:v} : typeof v === 'number' ? (Number.isInteger(v) ? {integerValue:String(v)} : {doubleValue:v}) : {stringValue:String(v)};
+function cloudDoc(){
+  const lv = p => LEVELS[p.level].n;
+  return { v: APP_VERSION, gid: G.gid, start: G.startTs, stand: new Date().toISOString(), phase: G.phase, schnell: !!G.quick,
+    geraete: S.players.filter(p => p.remote).length + 1,
+    spieler: S.players.map((p, i) => ({nr: i + 1, stufe: lv(p), punkte: G.scores[p.id] || 0, richtig: G.right[p.id] || 0, fern: !!p.remote})),
+    antworten: G.rec || [], fehler: CLOUD.errs.slice(-30) };
+}
+function cloudSave(now){
+  if (!G || !G.gid || !cloudOn()) return;
+  clearTimeout(CLOUD.timer);
+  const go = () => { try {
+    fetch(CLOUD.url + G.gid + '?key=' + CLOUD.key, {method:'PATCH', headers:{'Content-Type':'application/json'}, keepalive:true,
+      body: JSON.stringify({fields: toFS(cloudDoc()).mapValue.fields})})
+      .then(r => { if (!r.ok) log('cloud', {status: r.status}); }).catch(e => log('cloud', {fehler: String(e)}));
+  } catch {} };
+  now ? go() : (CLOUD.timer = setTimeout(go, 1500));
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') cloudSave(true); });
+window.addEventListener('error', e => { log('FEHLER', {msg: e.message, zeile: e.lineno}); CLOUD.errs.push(`${e.message} @${e.lineno}`); });
 window.addEventListener('unhandledrejection', e => log('FEHLER', {msg: String(e.reason && e.reason.message || e.reason)}));
 function renderLog(){
   const L = store.get('3gq2-log') || [];
@@ -1094,7 +1122,9 @@ function startGame(quick){
   S.players = shuffle(S.players); save();                       // Reihenfolge vor jedem Spiel mischen
   G = { quick, per, total: per * S.players.length, turn:0, cells:Array(25).fill(null), picks:[],
         scores:Object.fromEntries(S.players.map(p => [p.id, 0])), right:Object.fromEntries(S.players.map(p => [p.id, 0])),
-        prev:{}, used:[], lukasCount:0, lukasNow:false, phase:'turns', fin:0, q:null };
+        prev:{}, used:[], lukasCount:0, lukasNow:false, phase:'turns', fin:0, q:null,
+        gid: new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + '-' + Math.random().toString(36).slice(2, 6), startTs: new Date().toISOString(), rec:[] };
+  CLOUD.errs = [];
   handover();
 }
 function decideLukas(){
@@ -1346,6 +1376,8 @@ function answer(i){
       e.n++; if (ok) e.r++; ST[k] = e; store.set('3gq2-stats', ST);
     } catch {}
   }
+  try { (G.rec = G.rec || []).push({z: fin ? 'Finale' : q.lukas ? 'Lukas' : cellName(q.cell), s: LEVELS[p.level].n, nr: S.players.indexOf(p) + 1, ok, sek: Math.round(el * 10) / 10, lim: q.limit,
+    f: fin ? '' : q.prompt.slice(0, 140), a: fin ? '' : String(q.opts[q.correct]).slice(0, 60), g: i < 0 ? '(Zeit)' : fin ? '' : String(q.opts[i]).slice(0, 60), gen: q.key ? String(q.key).slice(0, 4) : (q.big || q.notes ? 'gen' : 'pool')}); cloudSave(); } catch {}
   log('antwort', {spieler: p.name, finale: fin, lukas: !!q.lukas, richtig: ok, punkte: gain, frage: q.prompt.slice(0, 60)});
   ownerFx(p, 'sfx', ok ? 'ok' : 'no'); if (p.remote) ok ? sfx.ok() : sfx.no();
   let next;
@@ -1376,7 +1408,7 @@ function next(){
   }
   if (G.phase === 'finale') {
     if (G.fin < S.players.length - 1) { G.fin++; handover(); }
-    else { G.phase = 'done'; persist(); podium(); }
+    else { G.phase = 'done'; persist(); cloudSave(true); podium(); }
     return;
   }
   G.turn++;
