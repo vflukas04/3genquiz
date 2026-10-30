@@ -252,6 +252,12 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .tile.htm .sh{display:none}
 .tile.htm{padding-left:.5rem;padding-right:.5rem}
 .tile.htm{display:flex;align-items:center;justify-content:center;text-align:center}
+.orapa{max-width:260px;display:block;margin:.2rem auto}
+.orchip{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid #fff;vertical-align:-2px;margin-right:4px}
+.orrays li{font-size:.92rem;padding:.3rem .6rem}
+.cards{display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle}
+.fcard{display:inline-block;min-width:30px;padding:2px 6px;border-radius:6px;font-weight:700;font-size:.85rem;text-align:center;border:1px solid rgba(0,0,0,.3)}
+.bauhand{margin:.3rem 0 .4rem}
 </style>
 
 <div id="app"></div>
@@ -654,7 +660,7 @@ function genTicTacToe(level){
 function genBoardSituation(col, level){
   const gens = col === 'form'
     ? (level === 'kind' ? [genMaedn, genPoints, genDice, genMaedn, genPoints, genDice, genMaedn, genTicTacToe] :   // Tic-Tac-Toe nur selten
-       [genKnight, genMate, genKnight, genMate, genMaedn])   // Erwachsene: Springer- und Matt-Rätsel
+       [genKnight, genMate])   // Erwachsene: Springer- und Matt-Rätsel
     : [genMaedn, genPoints, genDice, genMaedn, genPoints];
   return pick(gens)(level);
 }
@@ -936,23 +942,28 @@ function mmFeedback(secret, guess){
 }
 const allCodes = (n, k) => { let out = [[]]; for (let i = 0; i < n; i++) out = out.flatMap(c => Array.from({length:k}, (_, x) => [...c, x])); return out; };
 function genMastermind(level){
-  const kid = level === 'kind', n = kid ? 3 : 4, k = kid ? 4 : 6, nGuess = kid ? 2 : 3, ALL = allCodes(n, k);
-  for (let t = 0; t < 300; t++) {
+  const kid = level === 'kind', n = kid ? 3 : 4, k = kid ? 4 : 6, ALL = allCodes(n, k);
+  for (let t = 0; t < 600; t++) {
     const secret = Array.from({length:n}, () => rnd(k));
-    const guesses = Array.from({length:nGuess}, () => Array.from({length:n}, () => rnd(k)));
-    if (guesses.some(g => g.join() === secret.join())) continue;
-    const fb = guesses.map(g => mmFeedback(secret, g));
-    const consistent = ALL.filter(c => guesses.every((g, j) => { const f = mmFeedback(c, g); return f[0] === fb[j][0] && f[1] === fb[j][1]; }));
-    if (consistent.length > (kid ? 4 : 12)) continue;             // die Hinweise müssen ordentlich eingrenzen
-    // falsche Antworten: verletzen genau einen Hinweis (knapp daneben)
-    const near = ALL.filter(c => guesses.filter((g, j) => { const f = mmFeedback(c, g); return f[0] !== fb[j][0] || f[1] !== fb[j][1]; }).length === 1);
+    const guesses = [], fb = []; let cand = ALL;
+    for (let h = 0; h < (kid ? 3 : 4) && cand.length > 1; h++) {   // Hinweise, bis die Lösung eindeutig ist
+      let g; do { g = Array.from({length:n}, () => rnd(k)); } while (g.join() === secret.join());
+      const f = mmFeedback(secret, g);
+      if (f[0] + f[1] === 0 && Math.random() < .7) { h--; continue; }   // „nichts richtig“ ist zu leicht – selten zulassen
+      guesses.push(g); fb.push(f);
+      cand = cand.filter(c => { const x = mmFeedback(c, g); return x[0] === f[0] && x[1] === f[1]; });
+    }
+    if (cand.length !== 1 || guesses.length < 2) continue;          // eindeutig, aber nicht nach einem Hinweis
+    const after1 = ALL.filter(c => { const x = mmFeedback(c, guesses[0]); return x[0] === fb[0][0] && x[1] === fb[0][1]; });
+    if (after1.length < 6) continue;
+    const near = ALL.filter(c => c.join() !== secret.join() && guesses.filter((g, j) => { const f = mmFeedback(c, g); return f[0] !== fb[j][0] || f[1] !== fb[j][1]; }).length === 1);
     if (near.length < 3) continue;
     const wrong = sample(near, 3);
     const pegs = f => `<span class="mmpegs">${'<i class="pb"></i>'.repeat(f[0])}${'<i class="pw"></i>'.repeat(f[1])}${'<i class="p0"></i>'.repeat(n - f[0] - f[1])}</span>`;
     const html = `<div class="mm">${guesses.map((g, j) => `<div class="mmline">${dotRow(g)}${pegs(fb[j])}</div>`).join('')}</div>
       <div class="small">● schwarz = richtige Farbe am richtigen Platz · ○ weiß = richtige Farbe, falscher Platz${kid ? '' : ' · Farben können mehrfach vorkommen'}</div>`;
     const name = c => c.map(x => COLS6[x][0]).join(' ');
-    const opts = [secret, ...wrong], q = mk('Mastermind: Welcher Geheimcode passt zu allen Hinweisen?', {html}, name(secret), wrong.map(name), {key:'mm', extraT: kid ? 10 : 15});
+    const opts = [secret, ...wrong], q = mk('Mastermind: Welcher Geheimcode passt zu allen Hinweisen?', {html}, name(secret), wrong.map(name), {key:'mm', extraT: kid ? 15 : 25});
     q.optHtml = q.opts.map(o => dotRow(opts.find(c => name(c) === o), n === 4 ? 20 : 24));
     return q;
   }
@@ -974,7 +985,96 @@ function genStroop(level){
   return {steps, si:0, res:[], prompt: steps[0].prompt, opts: steps[0].opts, correct: steps[0].correct, info: 'Gefragt war immer die Schriftfarbe, nicht das Wort.',
     fixT: {kind: 18, erw: 10, gross: 14}, key:'st'};
 }
-function genFarbRaetsel(level){ return Math.random() < .55 ? genMastermind(level) : genStroop(level); }
+function genFarbRaetsel(level){
+  const kid = level === 'kind', r = Math.random();
+  if (kid) return r < .4 ? genMastermind(level) : r < .7 ? genStroop(level) : genBauliste(level);
+  return r < .3 ? genMastermind(level) : r < .55 ? genStroop(level) : r < .8 ? genOrapa() : genBauliste(level);
+}
+
+/* --- Orapa-artig: Strahlen durch ein verdecktes Raster, wo liegt der rote Kristall? (nur Erwachsene) --- */
+const OR_N = 6, OR_COL = {r:['Rot','#e53935'], b:['Blau','#1e6fe0'], y:['Gelb','#fdd835']};
+const OR_MIX = {'':['farblos','#ffffff00'], b:['Blau','#1e6fe0'], r:['Rot','#e53935'], y:['Gelb','#fdd835'], br:['Lila','#8e24aa'], by:['Grün','#2e9e44'], ry:['Orange','#fb8c00'], bry:['Schwarz','#111']};
+function orEntry(e){                                    // Randnummer 1–24 → Startfeld + Richtung
+  const N = OR_N;
+  if (e <= N) return {x:e-1, y:-1, dx:0, dy:1};                     // oben, links→rechts
+  if (e <= 2*N) return {x:N, y:e-N-1, dx:-1, dy:0};                 // rechts, oben→unten
+  if (e <= 3*N) return {x:3*N-e, y:N, dx:0, dy:-1};                 // unten, rechts→links
+  return {x:-1, y:4*N-e, dx:1, dy:0};                                // links, unten→oben
+}
+function orExit(x, y){ const N = OR_N; return y < 0 ? x+1 : x >= N ? N+y+1 : y >= N ? 3*N-x : 4*N-y; }
+function orRay(gems, e){                                 // gems: {"x,y": {c, t}} t: 'B' Block, '/' oder '\\' Spiegel
+  let {x, y, dx, dy} = orEntry(e); const hit = new Set();
+  for (let s = 0; s < 80; s++) {
+    x += dx; y += dy;
+    if (x < 0 || y < 0 || x >= OR_N || y >= OR_N) return {out: orExit(x, y), col: [...hit].sort().join('')};
+    const g = gems[x + ',' + y]; if (!g) continue;
+    hit.add(g.c);
+    if (g.t === 'B') { dx = -dx; dy = -dy; }
+    else if (g.t === '/') { [dx, dy] = [-dy, -dx]; }
+    else { [dx, dy] = [dy, dx]; }
+  }
+  return null;                                           // Endlosschleife (kommt praktisch nicht vor)
+}
+function orLayouts(fixed){                               // alle Belegungen mit rotem Kristall auf fixed
+  const out = [], T = ['B','/','\\'], cells = []; for (let x = 0; x < OR_N; x++) for (let y = 0; y < OR_N; y++) cells.push([x, y]);
+  for (const [bx, by] of cells) for (const [yx, yy] of cells) {
+    const kr = fixed, kb = bx+','+by, ky = yx+','+yy; if (kb === kr || ky === kr || kb === ky) continue;
+    for (const tr of T) for (const tb of T) for (const ty of T) out.push({[kr]:{c:'r', t:tr}, [kb]:{c:'b', t:tb}, [ky]:{c:'y', t:ty}});
+  }
+  return out;
+}
+function genOrapa(){
+  for (let t = 0; t < 40; t++) {
+    const cells = sample(Array.from({length:OR_N*OR_N}, (_, i) => [i % OR_N, Math.floor(i / OR_N)]).filter(([x, y]) => x > 0 && y > 0 && x < OR_N-1 && y < OR_N-1), 3);
+    const T = () => pick(['B','/','\\']);
+    const gems = {[cells[0].join()]:{c:'r', t:T()}, [cells[1].join()]:{c:'b', t:T()}, [cells[2].join()]:{c:'y', t:T()}};
+    const entries = sample(Array.from({length:4*OR_N}, (_, i) => i + 1), 5), rays = entries.map(e => ({e, ...orRay(gems, e)}));
+    if (rays.some(r => r.out == null) || rays.filter(r => r.col.includes('r')).length < 1 || rays.filter(r => r.col).length < 3) continue;
+    const redKey = cells[0].join();
+    const others = sample(Array.from({length:OR_N*OR_N}, (_, i) => (i % OR_N) + ',' + Math.floor(i / OR_N)).filter(k => k !== redKey && !gems[k]), 3);
+    const consistent = k => orLayouts(k).some(L => rays.every(r => { const z = orRay(L, r.e); return z && z.out === r.out && z.col === r.col; }));
+    if (others.some(consistent)) continue;               // eindeutig: nur das richtige Feld passt
+    const opts = shuffle([redKey, ...others]), lab = k => 'ABCD'[opts.indexOf(k)];
+    const c = 30, o = 22, W = o*2 + OR_N*c;
+    let svg = `<svg viewBox="0 0 ${W} ${W}" class="board-svg orapa">`;
+    for (let x = 0; x < OR_N; x++) for (let y = 0; y < OR_N; y++) {
+      const k = x+','+y, m = opts.includes(k);
+      svg += `<rect x="${o+x*c}" y="${o+y*c}" width="${c}" height="${c}" fill="${m ? '#ffc233' : '#2b1450'}" stroke="#5b3a8f"/>` + (m ? `<text x="${o+x*c+c/2}" y="${o+y*c+c/2+6}" text-anchor="middle" font-size="16" font-weight="700" fill="#1b0a30">${lab(k)}</text>` : '');
+    }
+    for (let e = 1; e <= 4*OR_N; e++) { const s = orEntry(e), px = o + (s.x + .5) * c, py = o + (s.y + .5) * c;
+      svg += `<text x="${px}" y="${py + 4}" text-anchor="middle" font-size="11" fill="#cbb9e8">${e}</text>`; }
+    svg += '</svg>';
+    const chip = col => `<i class="orchip" style="background:${OR_MIX[col][1]}"></i>${OR_MIX[col][0]}`;
+    const html = svg + `<ul class="facts orrays">${rays.map(r => `<li>Strahl rein bei <b>${r.e}</b> → raus bei <b>${r.out}</b> · ${chip(r.col)}</li>`).join('')}</ul>
+      <div class="small">Verdeckt liegen drei Kristalle: rot, blau, gelb. Jeder ist ein Block (wirft den Strahl zurück) oder ein schräger Spiegel (lenkt um 90° ab). Der Strahl nimmt die Farben aller getroffenen Kristalle an: Blau+Rot = Lila, Blau+Gelb = Grün, Rot+Gelb = Orange, alle drei = Schwarz.</div>`;
+    return mk('Kristallsuche: Auf welchem Feld liegt der ROTE Kristall?', {html}, 'Feld ' + lab(redKey), others.map(k => 'Feld ' + lab(k)), {key:'or', extraT: 35});
+  }
+  return null;
+}
+
+/* --- Bauliste wie bei Catan, nur mit Farbkarten --- */
+const BAU = [['Straße','🛣️'],['Haus','🏠'],['Mühle','🌾'],['Turm','🗼'],['Brücke','🌉'],['Burg','🏰'],['Schiff','⛵'],['Kirche','⛪']];
+function genBauliste(level){
+  const kid = level === 'kind', pal = COLS6.slice(0, kid ? 3 : 5);
+  for (let t = 0; t < 200; t++) {
+    const hand = pal.map(() => rnd(kid ? 4 : 5));
+    const blds = sample(BAU, kid ? 3 : 4).map(b => ({b, cost: pal.map(() => 0)}));
+    blds.forEach(B => { const nc = kid ? 2 : 3 + rnd(2); for (let j = 0; j < nc; j++) B.cost[rnd(pal.length)]++; });
+    const can = B => B.cost.every((c, i) => hand[i] >= c);
+    const cardRow = arr => `<span class="cards">${arr.map((n, i) => n ? `<span class="fcard" style="background:${pal[i][1]};color:${pal[i][0]==='Gelb'?'#1b0a30':'#fff'}">${n}×</span>` : '').join('')}</span>`;
+    const handHtml = `<div class="bauhand"><b>Deine Karten:</b> ${cardRow(hand)}</div><ul class="facts">${blds.map(B => `<li>${B.b[1]} ${B.b[0]}: ${cardRow(B.cost)}</li>`).join('')}</ul>`;
+    if (Math.random() < .5) {
+      const no = blds.filter(B => !can(B)); if (no.length !== 1) continue;
+      return mk('Welches Gebäude kannst du mit deinen Karten NICHT bauen?', {html: handHtml}, no[0].b[0], blds.filter(B => B !== no[0]).map(B => B.b[0]), {key:'bau', extraT: kid ? 15 : 10});
+    }
+    const B = pick(blds.filter(can)); if (!B) continue;
+    const rest = hand.map((n, i) => n - B.cost[i]), mx = Math.max(...rest);
+    if (rest.filter(n => n === mx).length !== 1) continue;
+    const right = pal[rest.indexOf(mx)][0];
+    return mk(`Du baust ${B.b[0] === 'Burg' || B.b[0] === 'Mühle' || B.b[0] === 'Brücke' || B.b[0] === 'Straße' || B.b[0] === 'Kirche' ? 'eine' : B.b[0] === 'Haus' || B.b[0] === 'Schiff' ? 'ein' : 'einen'} ${B.b[0]}. Von welcher Farbe hast du danach die meisten Karten?`, {html: handHtml}, right, sample(pal.map(p => p[0]).filter(x => x !== right), 3).concat(kid ? ['Keine Karte übrig'] : []).slice(0, 3), {key:'bau', extraT: kid ? 15 : 10});
+  }
+  return null;
+}
 
 
 /* =================== Spielzustand =================== */
@@ -984,7 +1084,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-170204';
+const APP_VERSION = '20261030-172910';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
