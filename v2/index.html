@@ -865,6 +865,7 @@ const landName = n => n === 'Vereinigtes Königreich' ? 'Großbritannien' : n ==
 const uniqW = (right, arr) => [...new Set(arr)].filter(x => x !== right);
 function genCapital(level){
   const kid = level === 'kind', G2 = DATA.geoCap, r = Math.random();
+  if (!kid && Math.random() < .5) { const q = genGeoPlus(); if (q) return q; }
   if (r < (kid ? .35 : .3)) {                                     // Landeshauptstädte
     const L = kid ? G2.laender.filter(l => ['Niedersachsen','Nordrhein-Westfalen','Bayern','Hessen','Sachsen','Baden-Württemberg','Schleswig-Holstein'].includes(l[0])) : G2.laender;
     const x = pickFresh(L, l => 'lh' + l[0]); if (!x) return null;
@@ -885,6 +886,32 @@ function genCapital(level){
   return mk(`Wie heißt die Hauptstadt von ${landName(s[0])}?`, null, s[1], wrong, {key:'hs'});
 }
 
+/* --- Erwachsene: Österreich, Flüsse, größte Städte, geteilte Grenzstädte (kuratiert) --- */
+const AT_LH = [['Burgenland','Eisenstadt'],['Kärnten','Klagenfurt'],['Niederösterreich','St. Pölten'],['Oberösterreich','Linz'],['Salzburg','Salzburg'],['Steiermark','Graz'],['Tirol','Innsbruck'],['Vorarlberg','Bregenz']];
+const AT_NOT = ['Villach','Wels','Dornbirn','Wiener Neustadt','Leoben','Kufstein','Steyr','Feldkirch'];
+const RIVERS = [['Wien','Donau'],['Paris','Seine'],['London','Themse'],['Rom','Tiber'],['Prag','Moldau'],['Budapest','Donau'],['Dresden','Elbe'],['Köln','Rhein'],['Frankfurt am Main','Main'],['München','Isar'],['Hamburg','Elbe'],['Bremen','Weser'],['Berlin','Spree'],['Warschau','Weichsel'],['Florenz','Arno'],['Lissabon','Tejo'],['Sevilla','Guadalquivir'],['Bratislava','Donau'],['Basel','Rhein'],['Bern','Aare'],['Zürich','Limmat'],['Salzburg','Salzach'],['Innsbruck','Inn'],['Graz','Mur'],['Hannover','Leine'],['Stuttgart','Neckar'],['Heidelberg','Neckar'],['Düsseldorf','Rhein'],['Würzburg','Main'],['Nürnberg','Pegnitz'],['Magdeburg','Elbe'],['Potsdam','Havel'],['Kassel','Fulda'],['Osnabrück','Hase'],['Regensburg','Donau'],['Bordeaux','Garonne'],['Kiew','Dnipro'],['Sankt Petersburg','Newa'],['Moskau','Moskwa'],['Kairo','Nil'],['Bagdad','Tigris'],['Trier','Mosel'],['Ulm','Donau'],['Krakau','Weichsel'],['Belgrad','Donau']];
+const MASC_R = ['Rhein','Main','Inn','Nil','Tiber','Neckar','Arno','Tigris','Tejo','Guadalquivir','Dnipro','Po','Ebro'];
+const amRiver = r => (MASC_R.includes(r) ? 'am ' : 'an der ') + r;
+const RIVER_ALL = [...new Set(RIVERS.map(r => r[1]).concat(['Ems','Saale','Oder','Neiße','Lahn','Ruhr','Lech','Po','Ebro','Loire','Rhône','Wolga','Schelde','Maas']))];
+const BIGGEST = [['Nordrhein-Westfalen','Köln',['Düsseldorf','Dortmund','Essen']],['Hessen','Frankfurt am Main',['Wiesbaden','Kassel','Darmstadt']],['Sachsen','Leipzig',['Dresden','Chemnitz','Zwickau']],['Mecklenburg-Vorpommern','Rostock',['Schwerin','Neubrandenburg','Stralsund']],
+  ['der Schweiz','Zürich',['Bern','Genf','Basel']],['der Türkei','Istanbul',['Ankara','Izmir','Antalya']],['Kanada','Toronto',['Ottawa','Montreal','Vancouver']],['den USA','New York City',['Washington, D.C.','Los Angeles','Chicago']],['Brasilien','São Paulo',['Brasília','Rio de Janeiro','Salvador']],['Marokko','Casablanca',['Rabat','Marrakesch','Fès']],['Neuseeland','Auckland',['Wellington','Christchurch','Hamilton']],['Kasachstan','Almaty',['Astana','Schymkent','Karaganda']]];
+const TWIN = [['Görlitz','Zgorzelec','Polen'],['Frankfurt (Oder)','Słubice','Polen'],['Guben','Gubin','Polen'],['Konstanz','Kreuzlingen','der Schweiz'],['Herzogenrath','Kerkrade','den Niederlanden'],['Narva','Iwangorod','Russland'],['Komárno','Komárom','Ungarn'],['Gorizia','Nova Gorica','Slowenien'],['Tornio','Haparanda','Schweden']];
+function genGeoPlus(){
+  const t = rnd(5);
+  if (t === 0) { const x = pickFresh(AT_LH, l => 'at' + l[0]); if (!x) return null;
+    return Math.random() < .5 ? mk(`Wie heißt die Landeshauptstadt des österreichischen Bundeslands ${x[0]}?`, null, x[1], sample(AT_LH.filter(l => l !== x).map(l => l[1]).concat(sample(AT_NOT, 2)), 3), {key:'at'})
+      : mk('Welche dieser österreichischen Städte ist KEINE Landeshauptstadt?', null, pick(AT_NOT), sample(AT_LH.map(l => l[1]), 3), {key:'at'}); }
+  if (t === 1) { const x = pickFresh(RIVERS, r => 'rv' + r[0]); if (!x) return null;
+    const other = RIVERS.filter(r => r[1] === x[1]).map(r => r[0]);
+    return Math.random() < .6 ? mk(`An welchem Fluss liegt ${x[0]}?`, null, x[1], sample(RIVER_ALL.filter(r => r !== x[1]), 3), {key:'rv'})
+      : mk(`Welche dieser Städte liegt ${amRiver(x[1])}?`, null, x[0], sample(RIVERS.filter(r => r[1] !== x[1] && !other.includes(r[0])).map(r => r[0]), 3), {key:'rv'}); }
+  if (t === 2) { const x = pickFresh(BIGGEST, b => 'bg' + b[0]); if (!x) return null;
+    return mk(`Welche ist die einwohnerreichste Stadt in ${x[0]}?`, null, x[1], x[2], {key:'bg'}); }
+  if (t === 3) { const x = pickFresh(TWIN, w => 'tw' + w[0]); if (!x) return null;
+    return mk(`Welche Stadt liegt direkt gegenüber von ${x[0]} – auf der anderen Seite der Landesgrenze?`, null, x[1], sample(TWIN.filter(w => w !== x).map(w => w[1]), 3), {info: 'liegt in ' + x[2], key:'tw'}); }
+  return null;
+}
+
 
 /* =================== Spielzustand =================== */
 let G = null, TIMER = null, quitArmed = null, ADMIN = false, logoTaps = 0, logoT = null, SEL = null;
@@ -893,7 +920,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-163937';
+const APP_VERSION = '20261030-164520';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
