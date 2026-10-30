@@ -1151,7 +1151,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-173541';
+const APP_VERSION = '20261030-175723';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1258,9 +1258,9 @@ function repaint(fresh){
 }
 function sendScreen(conn){
   const s = NET.screen; if (!s) return;
-  const inter = s.who !== 'all' && s.who.id === conn.pid;
+  const inter = (s.who !== 'all' && s.who.id === conn.pid) || (s.who === 'all' && G && G.bet && conn.pid !== G.bet.pid);   // Genre-Wette: alle anderen setzen mit
   const left = s.opts.timer ? Math.max(0, s.opts.timer - (performance.now() - s.t0) / 1000) : null;
-  try { conn.send({t:'html', html:s.html, inter, all:s.who === 'all', who: s.who !== 'all' ? {name:s.who.name, emoji:s.who.emoji} : null, timer:left, total:s.opts.timer || null}); } catch {}
+  try { conn.send({t:'html', html: FOTO ? s.html.split(FOTO).join('__FOTO__') : s.html, inter, all:s.who === 'all', who: s.who !== 'all' ? {name:s.who.name, emoji:s.who.emoji} : null, timer:left, total:s.opts.timer || null}); } catch {}
 }
 function netText(sel, text){ const el = $(sel); if (el) el.textContent = text; if (NET.role === 'host') for (const id in NET.conns) try { NET.conns[id].send({t:'text', sel, text}); } catch {} }
 /* Ton, Vorlesen, Melodie: auf dem Gerät der Person, die dran ist */
@@ -1397,6 +1397,7 @@ function guestMsg(m, autoId){
   }
   if (m.t === 'html') {
     clearInterval(GTIMER); GTIMER = null;
+    if (m.html.includes('__FOTO__')) m.html = m.html.split('__FOTO__').join(EMBED_FOTO || '');   // Foto liegt beim Gast schon in der Seite – nicht übers Netz schicken (zu groß)
     if (m.inter) app.innerHTML = m.html;
     else app.innerHTML = `<div class="mirrorbar">${m.who ? `<span class="e">${m.who.emoji}</span><span>${esc(m.who.name)} ist dran</span>` : '<span>Alle schauen</span>'}</div><div class="mirror">${m.html}</div>`;
     if (m.timer != null && m.total) {                   // Zeitbalken lokal animieren
