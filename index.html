@@ -363,11 +363,12 @@ const DEFAULTS = {
 };
 let S = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), store.get('3gq2-settings') || {});
 if (!(S.lukas in LUKAS_P) || !S.lukasV3) { S.lukas = 'normal'; S.lukasV3 = true; }   // wieder an (Fehler mit dem Foto behoben), höchstens 2× pro Spiel
+if (!S.perV2) { S.perPlayer = 99; S.perV2 = true; }   // Standard: so viele Fragen, dass das Raster fast voll wird
 S.players.forEach(p => { if (!(p.level in LEVELS)) p.level = 'erw'; });
 const EMBED_FOTO = DATA.foto || null;
 let FOTO = store.get('3gq-foto') || EMBED_FOTO;
 const save = () => store.set('3gq2-settings', S);
-const maxPer = () => Math.max(1, Math.min(5, Math.floor(25 / S.players.length)));
+const maxPer = () => Math.max(1, Math.min(12, Math.floor(24 / S.players.length)));   // Raster möglichst fast voll
 
 /* Flaggen-Emojis prüfen (Windows-PCs zeigen nur Buchstaben) */
 const FLAGS_OK = (() => {
@@ -996,7 +997,7 @@ function genMastermind(level){
     const html = `<div class="mm">${guesses.map((g, j) => `<div class="mmline">${dotRow(g)}${pegs(fb[j])}</div>`).join('')}</div>
       <div class="small">● schwarz = richtige Farbe am richtigen Platz · ○ weiß = richtige Farbe, falscher Platz${kid ? '' : ' · Farben können mehrfach vorkommen'}</div>`;
     const name = c => c.map(x => COLS6[x][0]).join(' ');
-    const opts = [secret, ...wrong], q = mk('Mastermind: Welcher Geheimcode passt zu allen Hinweisen?', {html}, name(secret), wrong.map(name), {key:'mm', extraT: kid ? 15 : 25});
+    const opts = [secret, ...wrong], q = mk('Mastermind: Welcher Geheimcode passt zu allen Hinweisen?', {html}, name(secret), wrong.map(name), {key:'mm', extraT: kid ? 20 : 30});
     q.optHtml = q.opts.map(o => dotRow(opts.find(c => name(c) === o), n === 4 ? 20 : 24));
     q.input = {n, k, secret}; q.inp = [];                 // Code selbst eingeben (Antwortkacheln nur für Protokoll/Auflösung)
     q.prompt = 'Mastermind: Gib den Geheimcode ein, der zu allen Hinweisen passt!';
@@ -1129,29 +1130,29 @@ function wettePool(cell, level){
 }
 const isWette = (cell, level) => !!wettePool(cell, level);
 const wetteOthers = () => Math.max(1, S.players.length - 1);
-const wetteMult = chips => Math.min(3, 1 + chips / wetteOthers());
+function wetteBetDone(){ const B = G.bet; B.mine.forEach((c, i) => B.chips[i] += c); B.mine = [0, 0, 0]; B.k++; persist(); if (B.k >= B.order.length) wetteChoose(); else wetteBetScreen(); }
+const wetteMult = chips => 0.6 + 0.6 * chips / wetteOthers();   // Schnitt ×1,0 · ohne Chips ×0,6 · alles auf ein Genre ×1,8
 const fmtMult = m => '×' + (Math.round(m * 10) / 10).toString().replace('.', ',');
 function wetteStart(cell, p){
   const pool = wettePool(cell, p.level);
-  G.bet = {cell, genres: sample(pool.map(g => g.id), 3), chips:[0, 0, 0], total: 2 * wetteOthers(), pid: p.id};
+  G.bet = {cell, genres: sample(pool.map(g => g.id), 3), chips:[0, 0, 0], mine:[0, 0, 0], total: 2, pid: p.id, order: shuffle(S.players.filter(x => x.id !== p.id).map(x => x.id)), k: 0};
   persist();
   if (S.players.length === 1) return wetteChoose();
   wetteBetScreen();
 }
 const genreById = (p, id) => wettePool(G.bet ? G.bet.cell : G.q.cell, p.level).find(g => g.id === id);
 function wetteBetScreen(){
-  const p = cur(), B = G.bet, used = B.chips.reduce((a, b) => a + b, 0);
+  const p = cur(), B = G.bet, b = S.players.find(x => x.id === B.order[B.k]), used = B.mine.reduce((a, c) => a + c, 0);
   paint(`
   <section class="screen">
     <div class="qcat"><div class="label"><span>${ROWS[cellRC(B.cell)[0]].e}${COLS[cellRC(B.cell)[1]].e}</span><span>${esc(cellName(B.cell))} · Genre-Wette</span></div></div>
-    <h2 class="catname">Alle außer ${esc(p.name)}: setzt eure Chips!</h2>
-    <p class="small">Setzt auf das Genre, das ${esc(p.name)} eurer Meinung nach NICHT kann. Wählt ${esc(p.name)} es trotzdem und antwortet richtig, gibt es mehr Punkte (höchstens ×3).</p>
+    <h2 class="catname">${esc(b.emoji || '')} ${esc(b.name)} setzt verdeckt</h2>
+    <p class="small">${esc(p.name)} schaut weg! Setz deine 2 Chips auf das Genre, das ${esc(p.name)} deiner Meinung nach NICHT kann. Wählt ${esc(p.name)} es trotzdem und antwortet richtig, gibt es mehr Punkte – sonst weniger.</p>
     <div class="wette">${B.genres.map((id, i) => `<div class="wrow"><span class="wname">${esc(genreById(p, id).name)}</span>
-      <button class="chip" data-act="betSub" data-i="${i}">−</button><b class="wchips">${'🪙'.repeat(B.chips[i]) || '·'}</b><button class="chip" data-act="betAdd" data-i="${i}">+</button>
-      <span class="wmult">${fmtMult(wetteMult(B.chips[i]))}</span></div>`).join('')}</div>
-    <p class="small">Chips gesetzt: ${used} von ${B.total}</p>
-    <button class="btn wide" data-act="betDone" ${used === B.total ? '' : 'disabled'}>Fertig – ${esc(p.name)} wählt</button>
-  </section>`, null);
+      <button class="chip" data-act="betSub" data-i="${i}">−</button><b class="wchips">${'🪙'.repeat(B.mine[i]) || '·'}</b><button class="chip" data-act="betAdd" data-i="${i}">+</button></div>`).join('')}</div>
+    <p class="small">Gesetzt: ${used} von 2 · noch ${B.order.length - B.k - 1} weitere nach dir</p>
+    <button class="btn wide" data-act="betDone" ${used === 2 ? '' : 'disabled'}>Fertig – verdeckt abgeben</button>
+  </section>`, b);
 }
 function wetteChoose(){
   const p = cur(), B = G.bet;
@@ -1256,7 +1257,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-191435';
+const APP_VERSION = '20261030-191553';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1332,8 +1333,8 @@ function hostMsg(conn, m){
   if (m.t === 'log') { log('gast:' + ((P(conn.pid) || {}).name || '?'), m.d); return; }
   if (m.t === 'act') {
     const ow = screenOwner();
-    const allowed = ['ready','cell','take','answer','next','speak','play','lukasGo','mmPick','mmDel','mmOk','genrePick'];
-    const betOk = ['betAdd','betSub','betDone'].includes(m.a) && G && G.bet && conn.pid !== G.bet.pid;
+    const allowed = ['ready','cell','take','answer','next','speak','play','lukasGo','mmPick','mmDel','mmOk','genrePick','betAdd','betSub','betDone'];
+    const betOk = false;
     if (!betOk && (!ow || ow.id !== conn.pid || !allowed.includes(m.a))) { log('klick-abgelehnt', {von: (P(conn.pid) || {}).name, aktion: m.a, dran: ow ? ow.name : 'alle'}); return; }
     act(m.a, +m.i, m.a === 'lukasGo' ? (P(conn.pid) || {}).name : m.v, null);
   }
@@ -1363,7 +1364,7 @@ function repaint(fresh){
 }
 function sendScreen(conn){
   const s = NET.screen; if (!s) return;
-  const inter = (s.who !== 'all' && s.who.id === conn.pid) || (s.who === 'all' && G && G.bet && conn.pid !== G.bet.pid);   // Genre-Wette: alle anderen setzen mit
+  const inter = (s.who !== 'all' && s.who.id === conn.pid);
   const left = s.opts.timer ? Math.max(0, s.opts.timer - (performance.now() - s.t0) / 1000) : null;
   try { conn.send({t:'html', html: FOTO ? s.html.split(FOTO).join('__FOTO__') : s.html, inter, all:s.who === 'all', who: s.who !== 'all' ? {name:s.who.name, emoji:s.who.emoji} : null, timer:left, total:s.opts.timer || null}); } catch {}
 }
@@ -1657,7 +1658,7 @@ function renderSetup(){
     <div class="block">
       <div class="label">Fragen pro Person</div>
       <div class="seg" role="group" aria-label="Fragen pro Person">
-        ${[2,3,4,5].filter(n => n <= mp).map(n => `<button data-act="per" data-v="${n}" aria-pressed="${Math.min(S.perPlayer,mp)===n}">${n}</button>`).join('')}
+        ${[...new Set([3,5,mp])].filter(n => n <= mp).sort((x, y) => x - y).map(n => `<button data-act="per" data-v="${n}" aria-pressed="${Math.min(S.perPlayer,mp)===n}">${n}</button>`).join('')}
       </div>
       <div class="small">Danach folgt das Memory-Finale. Jede richtige Antwort vorher macht es leichter: weniger Symbole zum Merken.</div>
     </div>
@@ -2047,9 +2048,9 @@ function act(act, i, v, b){
     case 'speak': G.q.audio ? playNotes(G.q.audio) : speakQ(); break;
     case 'play': playNotes(G.q.audio); break;
     case 'answer': if (G.q && G.q.gone && G.q.gone.includes(G.q.opts[i])) break; answer(i); break;
-    case 'betAdd': if (G.bet && G.bet.chips.reduce((x, y) => x + y, 0) < G.bet.total && G.bet.chips[i] < 2 * wetteOthers()) { G.bet.chips[i]++; wetteBetScreen(); } break;
-    case 'betSub': if (G.bet && G.bet.chips[i] > 0) { G.bet.chips[i]--; wetteBetScreen(); } break;
-    case 'betDone': if (G.bet) { persist(); wetteChoose(); } break;
+    case 'betAdd': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) < 2) { G.bet.mine[i]++; wetteBetScreen(); } break;
+    case 'betSub': if (G.bet && G.bet.mine[i] > 0) { G.bet.mine[i]--; wetteBetScreen(); } break;
+    case 'betDone': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) === 2) wetteBetDone(); break;
     case 'genrePick': if (G.bet) wettePick(i); break;
     case 'mmPick': if (G.q && G.q.input && G.q.inp.length < G.q.input.n) { G.q.inp.push(i); question(cur(), true); } break;
     case 'mmDel': if (G.q && G.q.input) { G.q.inp.pop(); question(cur(), true); } break;
