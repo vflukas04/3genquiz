@@ -461,7 +461,7 @@ function getQuestion(cellIdx, level){
   else if (row === 'vfl' && col === 'form') q = (Math.random() < (easy ? .3 : .6) ? genVflSort(level) : null) || fromPool(row, col, poolKey) || genVflSort(level);
   else if (row === 'geo' && col === 'klasse1') q = (Math.random() < .6 ? genCapital(level) : null) || fromPool(row, col, poolKey) || genCapital(level);
   else if (row === 'spiele' && col === 'farben') q = genFarbRaetsel(level) || fromPool(row, col, poolKey);
-  else if (row === 'geo' && col === 'form') q = (Math.random() < .8 ? genShape(easy) : null) || fromPool(row, col, poolKey) || genShape(!easy);
+  else if (row === 'geo' && col === 'form') q = (Math.random() < .25 ? genBerge(level) : null) || (Math.random() < .8 ? genShape(easy) : null) || fromPool(row, col, poolKey) || genShape(!easy);
   else if (row === 'musik' && col === 'form') q = (Math.random() < .65 ? genMelody(level) : null) || fromPool(row, col, poolKey) || genMelody(level);
   else if (row === 'spiele' && (col === 'klasse1' || col === 'form')) q = (Math.random() < .5 ? genBoardSituation(col, level) : null) || fromPool(row, col, poolKey) || genBoardSituation(col, level);
   else q = fromPool(row, col, poolKey);
@@ -941,6 +941,24 @@ function genGeoPlus(){
   return null;
 }
 
+/* --- Berggipfel sortieren (Höhen laut de.wikipedia, gerundet) --- */
+const PEAKS = [['Zugspitze',2962,'de',1],['Watzmann',2713,'de',0],['Feldberg (Schwarzwald)',1493,'de',1],['Brocken',1141,'de',1],['Fichtelberg',1215,'de',0],['Großer Arber',1456,'de',0],['Wasserkuppe',950,'de',0],
+  ['Großglockner',3798,'alpen',1],['Wildspitze',3768,'alpen',0],['Großvenediger',3657,'alpen',0],['Mont Blanc',4807,'alpen',1],['Matterhorn',4478,'alpen',1],['Dufourspitze',4634,'alpen',0],['Eiger',3967,'alpen',0],['Jungfrau',4158,'alpen',0],['Ortler',3905,'alpen',0],['Säntis',2502,'alpen',0],['Hochkönig',2941,'alpen',0],['Dachstein',2995,'alpen',0],
+  ['Mount Everest',8848,'welt',1],['K2',8611,'welt',0],['Kilimandscharo',5895,'welt',1],['Aconcagua',6961,'welt',0],['Denali',6190,'welt',0],['Elbrus',5642,'welt',0],['Fuji',3776,'welt',1],['Vesuv',1281,'welt',0],['Olymp',2918,'welt',0],['Pico del Teide',3715,'welt',0],['Ben Nevis',1345,'welt',0],['Schneekoppe',1603,'welt',0],['Mount Kosciuszko',2228,'welt',0]];
+function genBerge(level){
+  const kid = level === 'kind';
+  for (let t = 0; t < 60; t++) {
+    const set = kid ? PEAKS.filter(p => p[3]) : pick([PEAKS.filter(p => p[2] !== 'welt'), PEAKS.filter(p => p[2] === 'alpen'), PEAKS]);
+    const n = kid ? 3 : 4, ps = sample(set, n).sort((a, b) => b[1] - a[1]);
+    if (ps.some((p, i) => i && ps[i-1][1] < p[1] * (kid ? 1.25 : 1.03))) continue;   // Abstände groß genug
+    if (kid || Math.random() < .3) return mk('Welcher dieser Berge ist am höchsten?', null, ps[0][0], ps.slice(1).map(p => p[0]).concat(kid ? [] : []).slice(0, 3), {info: ps.map(p => `${p[0]} ${p[1].toLocaleString('de-DE')} m`).join(' · '), key:'bg'});
+    if (G.used.includes('bs' + ps.map(p => p[0]).sort().join())) continue;
+    G.used.push('bs' + ps.map(p => p[0]).sort().join());
+    return sortQ('Sortiere die Gipfel nach Höhe – der höchste zuerst.', ps.map(p => ({t: p[0], sol: p[1].toLocaleString('de-DE') + ' m'})), n);
+  }
+  return null;
+}
+
 /* =================== Spiele × Farben: Farbrätsel (Mastermind, Speed-Runde Farbwort) =================== */
 const COLS6 = [['Rot','#e53935'],['Blau','#1e6fe0'],['Grün','#2e9e44'],['Gelb','#fdd835'],['Lila','#8e24aa'],['Orange','#fb8c00']];
 const dotRow = (code, size = 22) => `<span class="mmrow">${code.map(c => `<i class="mmdot" style="background:${COLS6[c][1]};width:${size}px;height:${size}px"></i>`).join('')}</span>`;
@@ -1151,7 +1169,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-183224';
+const APP_VERSION = '20261030-184732';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
