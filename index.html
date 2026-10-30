@@ -272,6 +272,10 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .tile.gone{visibility:hidden;pointer-events:none}
 .hints li{transition:background .3s}.hints li.new{background:rgba(255,194,51,.25)}
 .tile.sm .sh{display:none}
+.recap{margin-top:1rem;background:rgba(255,255,255,.07);border-radius:14px;padding:.7rem .9rem;text-align:left;max-width:34rem;margin-left:auto;margin-right:auto}
+.recap .rq{font-weight:600;line-height:1.35;margin-top:.2rem}
+.recap details{margin-top:.5rem}.recap summary{cursor:pointer;color:#ffc233;font-weight:700}
+.recap .bigshow{margin-top:.5rem}
 </style>
 
 <div id="app"></div>
@@ -1257,7 +1261,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-191553';
+const APP_VERSION = '20261030-194543';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1883,6 +1887,7 @@ function answer(i){
       <div class="gain">+${gain}</div>
       <div class="solution">${q.steps ? '' : (ok ? 'Lösung' : 'Richtig wäre') + ': '}${sol}</div>
       ${q.lukas ? '<p class="small">Bonus von Lukas – jetzt bist du nochmal dran!</p>' : ''}
+      ${q.steps || fin ? '' : `<div class="recap"><div class="small">Die Frage war:</div><div class="rq">${esc(q.prompt)}</div>${q.big && !q.big.play && (q.big.html || q.big.svg || q.big.tx || q.big.em) ? `<details><summary>Bild/Hinweise nochmal ansehen</summary>${bigHTML(q.big)}</details>` : ''}</div>`}
     </div>
     <button class="btn lila wide" data-act="next">${next}</button>
   </section>`, p);
