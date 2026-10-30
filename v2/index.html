@@ -276,6 +276,10 @@ button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid va
 .recap .rq{font-weight:600;line-height:1.35;margin-top:.2rem}
 .recap details{margin-top:.5rem}.recap summary{cursor:pointer;color:#ffc233;font-weight:700}
 .recap .bigshow{margin-top:.5rem}
+.prewait{display:flex;justify-content:center;gap:10px;padding:2.2rem 0}
+.prewait span{width:14px;height:14px;border-radius:50%;background:#ffc233;animation:pw 1s infinite ease-in-out}
+.prewait span:nth-child(2){animation-delay:.15s}.prewait span:nth-child(3){animation-delay:.3s}
+@keyframes pw{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
 </style>
 
 <div id="app"></div>
@@ -1261,7 +1265,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-194543';
+const APP_VERSION = '20261030-194732';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1783,6 +1787,7 @@ function question(p, keep){
   const q = G.q, fin = G.phase === 'finale';
   const lv = LEVELS[p.level];
   if (q.elim) { q.big = {html: elimHTML(q)}; q.gone = elimGone(q); }
+  const pre = !keep && !q.revealed;                       // erst 2 s nur die Frage, dann Antworten + Uhr
   if (q.steps) { const s = q.steps[q.si || 0]; q.prompt = s.prompt; q.opts = s.opts; q.correct = s.correct; q.big = s.big; q.tileStyle = s.tileStyle; }
   const limit = q.fixT ? q.fixT[p.level] || q.fixT.erw : lv.t + (q.prompt.length > 140 ? 10 : 0) + (q.audio ? 10 + Math.ceil(q.audio.chord ? 3 : melDur(q)) : 0) + (q.big && q.big.html ? 5 : 0) + (q.extraT || 0);
   const label = fin ? `<span>🧠</span><span>Finale · Memory</span>`
@@ -1793,14 +1798,15 @@ function question(p, keep){
     ${header(p)}
     <div class="qcat"><div class="label">${label}</div><button class="speak" data-act="speak" aria-label="Frage vorlesen">🔊</button></div>
     <div class="qtext${q.prompt.length > 80 ? ' long' : ''}">${esc(q.prompt)}</div>
-    ${bigHTML(q.big)}
+    ${pre && q.steps ? '' : bigHTML(q.big)}
     <div class="timer" id="tm"><i></i></div>
-    ${q.input ? mmInputHTML(q) : `<div class="tiles">
+    ${pre ? `<div class="prewait"><span></span><span></span><span></span></div>` : q.input ? mmInputHTML(q) : `<div class="tiles">
       ${q.opts.map((o,i) => `<button class="tile c${i % 4} ${q.emojiOpts?'e':''}${q.optHtml?' htm':''}${q.opts.length > 4 ? ' sm' : ''}${q.gone && q.gone.includes(o) ? ' gone' : ''}" data-act="answer" data-i="${i}"${q.tileStyle ? ` style="${q.tileStyle[i]}"` : ''}>${q.emojiOpts||q.tileStyle?'':`<span class="sh">${SHAPES[i % 4]}</span>`}${q.optHtml ? q.optHtml[i] : esc(o)}</button>`).join('')}
     </div>`}
-  </section>`, p, {timer:limit});
+  </section>`, p, pre ? {} : {timer:limit});
+  if (pre) { clearTimer(); setTimeout(() => { if (G && G.q === q && !q.revealed) { q.revealed = true; question(p); } }, p.level === 'gross' ? 4000 : 2000); if (p.read && !q.steps && !q.audio) speakQ(); return; }
   if (keep) return;                                       // Speed-Runde: nächste Teilfrage, Uhr läuft weiter
-  if (q.audio) ownerFx(p, 'audio', q.audio); else if (p.read && !q.steps) speakQ();
+  if (q.audio) ownerFx(p, 'audio', q.audio);
   const t0 = performance.now(); let lastTick = -1;
   q.limit = limit; q.t0 = t0;
   clearTimer();
@@ -2052,7 +2058,7 @@ function act(act, i, v, b){
     case 'take': if (SEL != null && !G.lukasWait) take(); break;
     case 'speak': G.q.audio ? playNotes(G.q.audio) : speakQ(); break;
     case 'play': playNotes(G.q.audio); break;
-    case 'answer': if (G.q && G.q.gone && G.q.gone.includes(G.q.opts[i])) break; answer(i); break;
+    case 'answer': if (G.q && !G.q.revealed) break; if (G.q && G.q.gone && G.q.gone.includes(G.q.opts[i])) break; answer(i); break;
     case 'betAdd': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) < 2) { G.bet.mine[i]++; wetteBetScreen(); } break;
     case 'betSub': if (G.bet && G.bet.mine[i] > 0) { G.bet.mine[i]--; wetteBetScreen(); } break;
     case 'betDone': if (G.bet && G.bet.mine.reduce((x, y) => x + y, 0) === 2) wetteBetDone(); break;
