@@ -358,7 +358,7 @@ const DEFAULTS = {
   perPlayer:4, lukas:'normal', sound:true
 };
 let S = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), store.get('3gq2-settings') || {});
-if (!(S.lukas in LUKAS_P) || !S.lukasV2) { S.lukas = 'aus'; S.lukasV2 = true; }   // vorerst ausgeschaltet
+if (!(S.lukas in LUKAS_P) || !S.lukasV3) { S.lukas = 'normal'; S.lukasV3 = true; }   // wieder an (Fehler mit dem Foto behoben), höchstens 2× pro Spiel
 S.players.forEach(p => { if (!(p.level in LEVELS)) p.level = 'erw'; });
 const EMBED_FOTO = DATA.foto || null;
 let FOTO = store.get('3gq-foto') || EMBED_FOTO;
@@ -1151,7 +1151,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-182414';
+const APP_VERSION = '20261030-183224';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
