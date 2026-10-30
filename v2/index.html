@@ -635,7 +635,8 @@ function genTicTacToe(level){
 }
 function genBoardSituation(col, level){
   const gens = col === 'form'
-    ? (level === 'kind' ? [genTicTacToe, genMaedn] : [genKnight, genMate, genKnight, genMate, genMaedn])   // Erwachsene: Springer- und Matt-Rätsel
+    ? (level === 'kind' ? [genMaedn, genPoints, genDice, genMaedn, genPoints, genDice, genMaedn, genTicTacToe] :   // Tic-Tac-Toe nur selten
+       [genKnight, genMate, genKnight, genMate, genMaedn])   // Erwachsene: Springer- und Matt-Rätsel
     : [genMaedn, genPoints, genDice, genMaedn, genPoints];
   return pick(gens)(level);
 }
@@ -782,7 +783,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-004056';
+const APP_VERSION = '20261030-142823';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1079,7 +1080,7 @@ function renderLog(){
   app.innerHTML = `<section class="screen">
     <h2 class="catname" style="font-size:1.6rem">Protokoll</h2>
     <p class="small">Kopiere den Text und schicke ihn an Claude. Er enthält nur Spielereignisse von diesem Gerät (keine persönlichen Daten außer den Spielernamen).</p>
-    <textarea id="logtext" class="logtext" readonly>${esc(info + (L.length ? L.join('\n') : '(noch leer)'))}</textarea>
+    <textarea id="logtext" class="logtext" readonly>${esc(info + (L.length ? L.join('\n') : '(noch leer)') + '\n\n=== Fragen-Statistik (richtig/gestellt | Stufe | Feld | Frage | Lösung) ===\n' + Object.values(store.get('3gq2-stats') || {}).map(e => `${e.r}/${e.n} | ${e.s} | ${e.z} | ${e.f} | ${e.a}`).join('\n'))}</textarea>
     <button class="btn lila wide" data-act="logCopy">Kopieren</button>
     <button class="btn ghost wide" data-act="logClear">Protokoll leeren</button>
     <button class="btn ghost wide" data-act="home">Zurück</button></section>`;
@@ -1338,6 +1339,13 @@ function answer(i){
   }
   G.scores[p.id] += gain;
   G.done = fin ? 'F'+G.fin : q.lukas ? 'L'+G.turn : 'T'+G.turn;
+  if (!fin) {                                             // Fragen-Statistik (pro Gerät) – zeigt, was leicht/schwer ist
+    try {
+      const ST = store.get('3gq2-stats') || {}, k = hkey(q.prompt + '|' + q.opts[q.correct]);
+      const e = ST[k] || {f: q.prompt.slice(0, 90), a: q.opts[q.correct].slice(0, 30), z: q.lukas ? 'Lukas' : cellName(q.cell), s: LEVELS[p.level].n, n: 0, r: 0};
+      e.n++; if (ok) e.r++; ST[k] = e; store.set('3gq2-stats', ST);
+    } catch {}
+  }
   log('antwort', {spieler: p.name, finale: fin, lukas: !!q.lukas, richtig: ok, punkte: gain, frage: q.prompt.slice(0, 60)});
   ownerFx(p, 'sfx', ok ? 'ok' : 'no'); if (p.remote) ok ? sfx.ok() : sfx.no();
   let next;
