@@ -1414,7 +1414,7 @@ const P = id => S.players.find(p => p.id === id);
 const cur = () => S.players[G.turn % S.players.length];
 const persist = () => store.set('3gq2-game', G && G.phase !== 'done' ? {G, players:S.players} : null);
 /* =================== Mehrere Geräte (WebRTC über PeerJS, Testmodus über BroadcastChannel) =================== */
-const APP_VERSION = '20261030-212728';
+const APP_VERSION = '20261030-212748';
 const NET_TEST = /[?&]bc\b/.test(location.search);              // Testmodus: Tabs im selben Browser
 const NET_OK = NET_TEST || typeof window.Peer === 'function';
 const CODE_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
@@ -1634,12 +1634,16 @@ function guestMsg(m, autoId){
   if (m.t !== 'html' && m.t !== 'text' && m.t !== 'fx' && m.t !== 'overlay') GH.waiting = true;
   if (m.t === 'html') GH.waiting = false;
   if (m.t === 'players') {
-    if (m.v && m.v !== APP_VERSION) {                       // unterschiedliche Spielversionen: neu laden
+    if (m.v && m.v !== APP_VERSION) {                       // unterschiedliche Spielversionen
       gLog('version', {gast: APP_VERSION, host: m.v});
-      app.innerHTML = `<section class="screen"><div class="center"><div class="bigicon">🔄</div><h2>Bitte neu laden</h2>
-        <p>Dieses Handy hat eine ältere Version des Spiels als das Hauptgerät.</p></div>
-        <button class="btn lila wide" data-act="reloadNew">Neu laden</button></section>`;
-      return;
+      if (m.v > APP_VERSION) {                               // Gast ist älter: Gast neu laden
+        app.innerHTML = `<section class="screen"><div class="center"><div class="bigicon">🔄</div><h2>Bitte neu laden</h2>
+          <p>Dieses Handy hat eine ältere Version des Spiels als das Hauptgerät.</p></div>
+          <button class="btn lila wide" data-act="reloadNew">Neu laden</button></section>`;
+        return;
+      }
+      // Gast ist neuer als das Hauptgerät: trotzdem mitspielen (das Hauptgerät steuert alles), Hinweis fürs nächste Mal
+      try { NET.guestConn.send({t:'log', d:{typ:'hinweis', text:'Hauptgerät hat eine ältere Version – bitte vor dem nächsten Spiel neu laden'}}); } catch {}
     }
     const saved = autoId || (store.get('3gq2-me') || {})[NET.code];
     if (saved && m.list.some(p => p.id === saved)) { NET.guestConn.send({t:'claim', id:saved}); return; }
